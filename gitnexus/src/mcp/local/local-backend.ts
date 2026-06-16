@@ -52,6 +52,7 @@ import { PhaseTimer } from '../../core/search/phase-timer.js';
 import { checkStalenessAsync, checkCwdMatch } from '../../core/git-staleness.js';
 import { logger } from '../../core/logger.js';
 import { LIST_REPOS_DEFAULT_LIMIT, LIST_REPOS_MAX_LIMIT } from '../tools.js';
+import { recommendRepos } from '../../core/repo-index/query.js';
 // AI context generation is CLI-only (gitnexus analyze)
 // import { generateAIContextFiles } from '../../cli/ai-context.js';
 
@@ -1095,6 +1096,10 @@ export class LocalBackend {
 
     if (method.startsWith('group_')) {
       return this.handleGroupTool(method, params || {});
+    }
+
+    if (method === 'recommend_repo') {
+      return recommendRepos((params as Record<string, unknown>) ?? {});
     }
 
     const p = params && typeof params === 'object' ? (params as Record<string, unknown>) : {};

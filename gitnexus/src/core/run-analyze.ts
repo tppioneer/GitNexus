@@ -1062,6 +1062,14 @@ export async function runFullAnalysis(
       // Best-effort — don't fail the entire analysis for context file issues
     }
 
+    // ── Update repo description index (best-effort) ──────────────────
+    try {
+      const { updateRepoInIndex } = await import('./repo-index/update.js');
+      await updateRepoInIndex(repoPath);
+    } catch {
+      // repo-index update failure should never block or fail the analyze
+    }
+
     // ── Close LadybugDB ──────────────────────────────────────────────
     // Stop the manual checkpoint driver before closeLbug so its
     // in-flight CHECKPOINT cannot race the `safeClose` CHECKPOINT.
