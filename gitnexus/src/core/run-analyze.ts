@@ -1545,6 +1545,18 @@ export async function runFullAnalysis(
       }
     }
 
+    // ── Update repo recommendation evidence index (best-effort) ──────
+    try {
+      const { updateRepoEvidenceFromAnalyze } = await import('./repo-index/update.js');
+      await updateRepoEvidenceFromAnalyze({
+        repoPath,
+        repoName: projectName,
+        stats: meta.stats,
+      });
+    } catch {
+      // repo-index update failure should never block or fail the analyze
+    }
+
     // ── Close LadybugDB ──────────────────────────────────────────────
     // Stop the manual checkpoint driver before closeLbug so its
     // in-flight CHECKPOINT cannot race the `safeClose` CHECKPOINT.
