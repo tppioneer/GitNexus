@@ -62,6 +62,7 @@ import {
   PDG_QUERY_DEFAULT_LIMIT,
   PDG_QUERY_MAX_LIMIT,
 } from '../tools.js';
+import { recommendRepos } from '../../core/repo-index/query.js';
 import { findImportCycles } from '../../core/graph/import-cycles.js';
 import { decodeTaintPath } from '../../core/ingestion/taint/path-codec.js';
 import { decodeReachingDefReason } from '../../core/ingestion/cfg/reaching-def-reason-codec.js';
@@ -1310,6 +1311,10 @@ export class LocalBackend {
 
     if (method.startsWith('group_')) {
       return this.handleGroupTool(method, params || {});
+    }
+
+    if (method === 'recommend_repo') {
+      return recommendRepos((params as Record<string, unknown>) ?? {});
     }
 
     const p = params && typeof params === 'object' ? (params as Record<string, unknown>) : {};
