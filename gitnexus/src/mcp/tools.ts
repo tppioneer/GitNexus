@@ -878,6 +878,10 @@ DESTINATION TRACE (cross-repo): for an "@groupName" trace, OMIT to/to_uid/to_fil
   },
 ];
 
+// Registered from repo-index/tool-def.js — tool definition lives there, not inline.
+import { RECOMMEND_REPO_TOOL } from '../core/repo-index/tool-def.js';
+GITNEXUS_TOOLS.push(RECOMMEND_REPO_TOOL);
+
 /**
  * Per-repo tools that accept an optional `branch` scope (#2106). Single source
  * of truth: the schema property is injected here so it cannot drift from the
