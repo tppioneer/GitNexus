@@ -489,39 +489,122 @@ export * from './milvus-vector-store.js';
 
 ## 部署
 
+### 架构说明
+
+Milvus 2.3+ standalone 模式需要三个组件协同：
+
+```
+┌─────────────────────────────────────────────────┐
+│                    Milvus Proxy                  │
+│  gRPC :19530 — Search / Insert / CreateIndex    │
+│  元数据 (collection schema, 索引状态, 节点注册)    │
+│  持久化 (向量数据, 索引文件, WAL, binlog)         │
+└──────┬──────────────────────────┬────────────────┘
+       │ 元数据                    │ 持久化
+       ▼                          ▼
+┌──────────────┐          ┌──────────────┐
+│    etcd       │          │    minio      │
+│  · Collection │          │  · 向量原始数据│
+│    schema     │          │  · HNSW 索引   │
+│  · 索引状态    │          │  · WAL 日志   │
+│  · 分布式锁    │          │               │
+└──────────────┘          └──────────────┘
+```
+
+项目已提供标准化 `scripts/milvus-standalone.yaml` 编排文件。
+
 ### 开发 / 测试环境
 
+**PowerShell:**
+
+```powershell
+# 1. 拉起 Milvus + etcd + minio
+docker compose -f scripts/milvus-standalone.yaml -p gitnexus up -d
+
+# 验证就绪（看到 "ready to serve" 即为成功）
+docker logs gitnexus-standalone-1 2>&1 | Select-String "ready to serve"
+
+# 2. 分析（首次自动创建 per-repo collection + HNSW 索引）
+cd gitnexus
+$env:GITNEXUS_VECTOR_STORE="milvus"
+$env:GITNEXUS_MILVUS_ADDRESS="localhost:19530"
+node dist/cli/index.js analyze <repo-path> --force --embeddings
+
+# 3. MCP 查询（自动走 gRPC 向量搜索）
+$env:GITNEXUS_VECTOR_STORE="milvus"
+$env:GITNEXUS_MILVUS_ADDRESS="localhost:19530"
+npx gitnexus serve
+
+# 停止（保留数据）
+docker compose -f scripts/milvus-standalone.yaml -p gitnexus stop
+
+# 销毁（含数据）
+docker compose -f scripts/milvus-standalone.yaml -p gitnexus down -v
+```
+
+**Linux/macOS:**
+
 ```bash
-# 1. 一行拉起 Milvus Standalone
-docker run -d --name milvus-standalone \
-  -p 19530:19530 -p 9091:9091 \
-  milvusdb/milvus:latest
+# 1. 拉起
+docker compose -f scripts/milvus-standalone.yaml -p gitnexus up -d
 
-# 2. 安装 GitNexus（Milvus SDK 为可选依赖）
-npm install @zilliz/milvus2-sdk-node   # 仅在启用 Milvus 时需要
+# 验证
+docker logs gitnexus-standalone-1 2>&1 | grep "ready to serve"
 
-# 3. 运行 analyze（首次自动创建 collection + index）
+# 2. 分析
 GITNEXUS_VECTOR_STORE=milvus \
 GITNEXUS_MILVUS_ADDRESS=localhost:19530 \
-npx gitnexus analyze --embeddings
+npx gitnexus analyze <repo-path> --force --embeddings
 
-# 4. MCP 查询（自动走 gRPC 搜索）
+# 3. MCP 查询
 GITNEXUS_VECTOR_STORE=milvus \
 GITNEXUS_MILVUS_ADDRESS=localhost:19530 \
 npx gitnexus serve
+
+# 停止
+docker compose -f scripts/milvus-standalone.yaml -p gitnexus stop
+
+# 销毁
+docker compose -f scripts/milvus-standalone.yaml -p gitnexus down -v
 ```
+
+### 环境变量自动检测
+
+GitNexus 在两个入口自动读取 `GITNEXUS_VECTOR_STORE` 决定向量后端：
+
+| 入口 | 检测时机 | 机制 |
+|------|---------|------|
+| `gitnexus analyze` | Phase 4（embedding 阶段前） | `run-analyze.ts` 中调用 `resolveVectorStoreConfig()` + `createVectorStore()` |
+| `gitnexus serve` / `gitnexus mcp` | `LocalBackend.init()` 启动时 | `local-backend.ts` 的 `init()` 方法自动读 env 初始化 vectorStore |
+
+不需要命令行参数，不需要配置文件。只需启动时设置环境变量：
+
+```powershell
+# analyze 路径
+$env:GITNEXUS_VECTOR_STORE="milvus"
+$env:GITNEXUS_MILVUS_ADDRESS="localhost:19530"
+node dist/cli/index.js analyze <repo-path> --force --embeddings
+
+# serve / MCP 路径（同样两个 env var）
+$env:GITNEXUS_VECTOR_STORE="milvus"
+$env:GITNEXUS_MILVUS_ADDRESS="localhost:19530"
+node dist/cli/index.js serve
+```
+
+> **不设 env var 时**两个入口都走 Kuzu 默认模式，零行为变化。Milvus 连接失败不阻塞服务启动——`LocalBackend.init()` 只 warn，语义搜索回退到精确 cosine 扫描。
 
 ### 生产环境
 
 | 组件 | 选项 | 说明 |
 |------|------|------|
 | Milvus 服务 | Milvus Cluster / Zilliz Cloud | 高可用、自动扩缩容 |
+| etcd + minio | 云原生替代 (AWS S3 + 托管 etcd) | Milvus Cluster 场景下的标准底座 |
 | Embedding 服务 | 自建 / OpenAI / Voyage / Cohere | 任何 OpenAI 兼容 `/v1/embeddings` 端点 |
 | GitNexus | `npx gitnexus serve` | MCP 进程，纯 JS |
 
 ### 依赖策略
 
-`@zilliz/milvus2-sdk-node` 作为 **optionalDependency**，不安装时 Kuzu 模式正常运行。仅在设置 `GITNEXUS_VECTOR_STORE=milvus` 时才要求该依赖存在，factory 函数在 import 失败时给出明确安装提示。
+`@zilliz/milvus2-sdk-node` 作为 runtime dependency，纯 JS gRPC 实现，无 native 模块，不受 glibc 版本影响。
 
 ## 风险与回退
 

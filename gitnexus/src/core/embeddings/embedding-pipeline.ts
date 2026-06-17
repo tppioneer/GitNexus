@@ -41,6 +41,7 @@ import { loadVectorExtension, createVectorIndex } from '../lbug/lbug-adapter.js'
 import type { ExtensionInstallPolicy } from '../lbug/extension-loader.js';
 import { getExactScanLimit } from '../platform/capabilities.js';
 import { logger } from '../logger.js';
+import type { VectorStore, VectorSearchResult } from './vector-store.js';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -50,18 +51,6 @@ const vectorUnavailableMessage =
   '(GITNEXUS_LBUG_EXTENSION_INSTALL=auto), or pre-install it for offline use. ' +
   'Set GITNEXUS_LBUG_EXTENSION_INSTALL=never to skip installs and silence this.';
 
-/**
- * Resolve the extension-install policy for the embedding WRITE path (analyze).
- *
- * Generating embeddings is an explicit opt-in to a feature that requires the
- * VECTOR extension, so when the operator has NOT pinned a policy we default to
- * `auto` (one bounded, out-of-process INSTALL) — matching the documented
- * "auto = default for analyze" intent in extension-loader.ts. An explicit
- * GITNEXUS_LBUG_EXTENSION_INSTALL=load-only|never|auto always wins, so an
- * offline or locked-down operator is never silently forced onto the network
- * (the #1153 regression caused by hard-coding `auto` here). Read on every call
- * (not memoized) so test env stubbing works.
- */
 export const resolveEmbeddingInstallPolicy = (): ExtensionInstallPolicy => {
   const raw = process.env.GITNEXUS_LBUG_EXTENSION_INSTALL;
   if (raw === 'load-only' || raw === 'never' || raw === 'auto') return raw;
@@ -181,6 +170,7 @@ const queryEmbeddableNodes = async (
 
 /**
  * Batch INSERT chunk-aware embeddings into CodeEmbedding table
+ * @deprecated Use vectorStore.insert() instead
  */
 export const batchInsertEmbeddings = async (
   executeWithReusedStatement: (
@@ -263,7 +253,8 @@ export interface EmbeddingPipelineResult {
  * @param existingEmbeddings - Optional map of nodeId → contentHash for incremental mode.
  *        Nodes whose hash matches are skipped; nodes with a changed hash are DELETE'd
  *        and re-embedded; nodes not in the map are embedded fresh.
-
+ * @param vectorStore - Optional VectorStore for Milvus or other backends.
+ *        When provided, all vector operations go through it instead of direct Cypher.
  */
 export const runEmbeddingPipeline = async (
   executeQuery: (cypher: string) => Promise<any[]>,
@@ -276,12 +267,13 @@ export const runEmbeddingPipeline = async (
   skipNodeIds?: Set<string>,
   context?: EmbeddingContext,
   existingEmbeddings?: Map<string, string>,
+  vectorStore?: VectorStore,
 ): Promise<EmbeddingPipelineResult> => {
   const finalConfig = resolveEmbeddingConfig(config);
   let totalChunks = 0;
 
   try {
-    const vectorAvailable = await ensureVectorExtensionAvailable();
+    const vectorAvailable = vectorStore ? true : await ensureVectorExtensionAvailable();
     if (!vectorAvailable) {
       logger.warn(vectorUnavailableMessage);
     }
@@ -350,25 +342,25 @@ export const runEmbeddingPipeline = async (
       });
 
       // DELETE stale embedding rows so they can be re-inserted
-      // (Kuzu forbids SET on vector-indexed properties; DELETE-then-INSERT is the sanctioned pattern)
       if (staleNodeIds.length > 0) {
         if (isDev) {
           logger.info(`🔄 Deleting ${staleNodeIds.length} stale embedding rows for re-embed`);
         }
-        try {
-          await executeWithReusedStatement(
-            `MATCH (e:${EMBEDDING_TABLE_NAME} {nodeId: $nodeId}) DELETE e`,
-            staleNodeIds.map((nodeId) => ({ nodeId })),
-          );
-        } catch (err) {
-          // "does not exist" = rows already gone — safe to proceed.
-          // All other errors risk vector-index corruption (Kuzu requires DELETE-before-INSERT
-          // for vector-indexed properties) — propagate so the pipeline aborts cleanly.
-          const msg = err instanceof Error ? err.message : String(err);
-          if (!msg.includes('does not exist')) {
-            throw new Error(
-              `[embed] Failed to delete stale embedding rows — aborting to prevent vector-index corruption: ${msg}`,
+        if (vectorStore) {
+          await vectorStore.deleteByNodeIds(staleNodeIds, context?.repoName);
+        } else {
+          try {
+            await executeWithReusedStatement(
+              `MATCH (e:${EMBEDDING_TABLE_NAME} {nodeId: $nodeId}) DELETE e`,
+              staleNodeIds.map((nodeId) => ({ nodeId })),
             );
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (!msg.includes('does not exist')) {
+              throw new Error(
+                `[embed] Failed to delete stale embedding rows — aborting to prevent vector-index corruption: ${msg}`,
+              );
+            }
           }
         }
       }
@@ -519,10 +511,16 @@ export const runEmbeddingPipeline = async (
 
         const dbUpdates = subUpdates.map((u, i) => ({
           ...u,
+          id: `${u.nodeId}:${u.chunkIndex}`,
           embedding: embeddingToArray(embeddings[i]),
+          repoName: context?.repoName,
         }));
 
-        await batchInsertEmbeddings(executeWithReusedStatement, dbUpdates);
+        if (vectorStore) {
+          await vectorStore.insert(dbUpdates);
+        } else {
+          await batchInsertEmbeddings(executeWithReusedStatement, dbUpdates);
+        }
       }
 
       processedNodes += batch.length;
@@ -551,7 +549,9 @@ export const runEmbeddingPipeline = async (
       logger.info('📇 Creating vector index...');
     }
 
-    const vectorIndexReady = await buildVectorIndex();
+    const vectorIndexReady = vectorStore
+      ? await vectorStore.createIndex()
+      : await buildVectorIndex();
 
     onProgress({
       phase: 'ready',
@@ -596,6 +596,8 @@ export const semanticSearch = async (
   query: string,
   k: number = 10,
   maxDistance: number = 0.5,
+  vectorStore?: VectorStore,
+  repoName?: string,
 ): Promise<SemanticSearchResult[]> => {
   if (!isEmbedderReady()) {
     throw new Error('Embedding model not initialized. Run embedding pipeline first.');
@@ -603,16 +605,87 @@ export const semanticSearch = async (
 
   const queryEmbedding = await embedText(query);
   const queryVec = embeddingToArray(queryEmbedding);
+
+  let bestChunks: VectorSearchResult[];
+
+  if (vectorStore) {
+    bestChunks = await vectorStore.search(queryVec, k, repoName, maxDistance);
+  } else {
+    bestChunks = await kuzuSearch(executeQuery, queryVec, k, maxDistance);
+  }
+
+  if (bestChunks.length === 0) {
+    return [];
+  }
+
+  // Group results by label for batched metadata queries
+  const byLabel = new Map<
+    string,
+    Array<{ nodeId: string; distance: number } & Record<string, any>>
+  >();
+  for (const chunk of bestChunks.slice(0, k)) {
+    const labelEndIdx = chunk.nodeId.indexOf(':');
+    const label = labelEndIdx > 0 ? chunk.nodeId.substring(0, labelEndIdx) : 'Unknown';
+    if (!byLabel.has(label)) byLabel.set(label, []);
+    byLabel.get(label)!.push({ nodeId: chunk.nodeId, ...chunk });
+  }
+
+  // Batch-fetch metadata per label
+  const results: SemanticSearchResult[] = [];
+
+  for (const [label, items] of byLabel) {
+    const idList = items.map((i) => `'${i.nodeId.replace(/'/g, "''")}'`).join(', ');
+    try {
+      const nodeQuery = `
+        MATCH (n:\`${label}\`) WHERE n.id IN [${idList}]
+        RETURN n.id AS id, n.name AS name, n.filePath AS filePath,
+               n.startLine AS startLine, n.endLine AS endLine
+      `;
+      const nodeRows = await executeQuery(nodeQuery);
+      const rowMap = new Map<string, any>();
+      for (const row of nodeRows) {
+        const id = row.id ?? row[0];
+        rowMap.set(id, row);
+      }
+      for (const item of items) {
+        const nodeRow = rowMap.get(item.nodeId);
+        if (nodeRow) {
+          results.push({
+            nodeId: item.nodeId,
+            name: nodeRow.name ?? nodeRow[1] ?? '',
+            label,
+            filePath: nodeRow.filePath ?? nodeRow[2] ?? '',
+            distance: item.distance,
+            startLine: item.startLine,
+            endLine: item.endLine,
+          });
+        }
+      }
+    } catch {
+      // Table might not exist, skip
+    }
+  }
+
+  results.sort((a, b) => a.distance - b.distance);
+
+  return results;
+};
+
+/**
+ * Kuzu-native vector search (fallback when no VectorStore is provided)
+ */
+async function kuzuSearch(
+  executeQuery: (cypher: string) => Promise<any[]>,
+  queryVec: number[],
+  k: number,
+  maxDistance: number,
+): Promise<VectorSearchResult[]> {
   const queryVecStr = `[${queryVec.join(',')}]`;
 
   let bestChunks = new Map<
     string,
     { distance: number; chunkIndex: number; startLine: number; endLine: number }
   >();
-  // Query/read path: NEVER spawn a network INSTALL on a user query. If the
-  // VECTOR extension was not pre-installed, fall back to exact scan rather than
-  // blocking the query on a download (offline-first; see extension-loader.ts
-  // "load-only" — used by all serve/MCP query paths).
   if (await loadVectorExtension(undefined, { policy: 'load-only' })) {
     try {
       bestChunks = await collectBestChunks(k, async (fetchLimit) => {
@@ -675,62 +748,14 @@ export const semanticSearch = async (
     }
   }
 
-  if (bestChunks.size === 0) {
-    return [];
-  }
-
-  // Group results by label for batched metadata queries
-  const byLabel = new Map<
-    string,
-    Array<{ nodeId: string; distance: number } & Record<string, any>>
-  >();
-  for (const [nodeId, chunk] of Array.from(bestChunks.entries()).slice(0, k)) {
-    const labelEndIdx = nodeId.indexOf(':');
-    const label = labelEndIdx > 0 ? nodeId.substring(0, labelEndIdx) : 'Unknown';
-    if (!byLabel.has(label)) byLabel.set(label, []);
-    byLabel.get(label)!.push({ nodeId, ...chunk });
-  }
-
-  // Batch-fetch metadata per label
-  const results: SemanticSearchResult[] = [];
-
-  for (const [label, items] of byLabel) {
-    const idList = items.map((i) => `'${i.nodeId.replace(/'/g, "''")}'`).join(', ');
-    try {
-      const nodeQuery = `
-        MATCH (n:\`${label}\`) WHERE n.id IN [${idList}]
-        RETURN n.id AS id, n.name AS name, n.filePath AS filePath,
-               n.startLine AS startLine, n.endLine AS endLine
-      `;
-      const nodeRows = await executeQuery(nodeQuery);
-      const rowMap = new Map<string, any>();
-      for (const row of nodeRows) {
-        const id = row.id ?? row[0];
-        rowMap.set(id, row);
-      }
-      for (const item of items) {
-        const nodeRow = rowMap.get(item.nodeId);
-        if (nodeRow) {
-          results.push({
-            nodeId: item.nodeId,
-            name: nodeRow.name ?? nodeRow[1] ?? '',
-            label,
-            filePath: nodeRow.filePath ?? nodeRow[2] ?? '',
-            distance: item.distance,
-            startLine: item.startLine,
-            endLine: item.endLine,
-          });
-        }
-      }
-    } catch {
-      // Table might not exist, skip
-    }
-  }
-
-  results.sort((a, b) => a.distance - b.distance);
-
-  return results;
-};
+  return Array.from(bestChunks.entries()).slice(0, k).map(([nodeId, chunk]) => ({
+    nodeId,
+    chunkIndex: chunk.chunkIndex,
+    startLine: chunk.startLine,
+    endLine: chunk.endLine,
+    distance: chunk.distance,
+  }));
+}
 
 /**
  * Semantic search with graph expansion (flattened results)
@@ -740,8 +765,10 @@ export const semanticSearchWithContext = async (
   query: string,
   k: number = 5,
   _hops: number = 1,
+  vectorStore?: VectorStore,
+  repoName?: string,
 ): Promise<any[]> => {
-  const results = await semanticSearch(executeQuery, query, k, 0.5);
+  const results = await semanticSearch(executeQuery, query, k, 0.5, vectorStore, repoName);
 
   return results.map((r) => ({
     matchId: r.nodeId,

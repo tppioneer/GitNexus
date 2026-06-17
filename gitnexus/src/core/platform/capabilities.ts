@@ -62,10 +62,15 @@ export const getRuntimeFingerprint = (): RuntimeFingerprint => ({
 
 export const isVectorExtensionSupportedByPlatform = (
   platform: NodeJS.Platform = process.platform,
-): boolean => platform !== 'win32';
+): boolean => {
+  // When Milvus is configured, VECTOR extension is not needed
+  if (process.env.GITNEXUS_VECTOR_STORE === 'milvus') return true;
+  return platform !== 'win32';
+};
 
 export const getRuntimeCapabilities = (): RuntimeCapabilities => {
-  const vector = isVectorExtensionSupportedByPlatform() ? 'available' : 'unavailable';
+  const isMilvus = process.env.GITNEXUS_VECTOR_STORE === 'milvus';
+  const vector = isMilvus ? 'available' : isVectorExtensionSupportedByPlatform() ? 'available' : 'unavailable';
   const exactScanLimit = getExactScanLimit();
   return {
     graph: 'available',
