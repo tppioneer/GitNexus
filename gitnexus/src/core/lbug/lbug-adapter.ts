@@ -2168,6 +2168,8 @@ export const loadVectorExtension = async (
   targetConn?: lbug.Connection,
   opts: ExtensionEnsureOptions = {},
 ): Promise<boolean> => {
+  // When Milvus is configured, skip VECTOR extension loading entirely
+  if (process.env.GITNEXUS_VECTOR_STORE === 'milvus') return false;
   const useModuleState = targetConn === undefined;
   if (useModuleState && vectorExtensionLoaded) return true;
   // INSTALL VECTOR crashes with SIGSEGV on Windows: the KuzuDB native extension
