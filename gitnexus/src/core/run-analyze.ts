@@ -10,6 +10,7 @@
  */
 
 import path from 'path';
+import type { VectorStore } from './embeddings/vector-store.js';
 import fs from 'fs/promises';
 import { execFileSync } from 'child_process';
 import { runPipelineFromRepo } from './ingestion/pipeline.js';
@@ -450,6 +451,21 @@ export async function runFullAnalysis(
     );
   }
 
+  // Resolve the repo name and vector store early so cache-load (below)
+  // and cache-restore (Phase 3.5) can use them — without this, Milvus
+  // mode would always fall through to Kuzu for those two steps.
+  const resolvedRepoName =
+    options.registryName ??
+    getInferredRepoName(repoPath) ??
+    path.basename(resolveRepoIdentityRoot(repoPath));
+  const { resolveVectorStoreConfig: resolveVSCache } =
+    await import('./embeddings/vector-store-config.js');
+  const vsConfig = resolveVSCache();
+  const { createVectorStore: createVSCache } =
+    await import('./embeddings/vector-store-factory.js');
+  const embeddingVectorStore: VectorStore | undefined =
+    vsConfig.kind === 'milvus' ? await createVSCache(vsConfig) : undefined;
+
   // We *always* load the embedding cache when one is requested (regardless
   // of the predicted `willTryIncremental`). The post-pipeline branch may
   // disagree with the prediction (e.g. when the pipeline produces zero
@@ -461,11 +477,19 @@ export async function runFullAnalysis(
   if (shouldLoadCache && existingMeta) {
     try {
       progress('embeddings', 0, 'Caching embeddings...');
-      await initLbug(lbugPath);
-      const cached = await loadCachedEmbeddings();
-      cachedEmbeddingNodeIds = cached.embeddingNodeIds;
-      cachedEmbeddings = cached.embeddings;
-      await closeLbug();
+      if (embeddingVectorStore) {
+        // Milvus mode: load cached embeddings from the per-repo collection
+        const hashes = await embeddingVectorStore.getExistingHashes(resolvedRepoName);
+        const all = await embeddingVectorStore.loadAll(resolvedRepoName);
+        cachedEmbeddingNodeIds = new Set(hashes.keys());
+        cachedEmbeddings = all;
+      } else {
+        await initLbug(lbugPath);
+        const cached = await loadCachedEmbeddings();
+        cachedEmbeddingNodeIds = cached.embeddingNodeIds;
+        cachedEmbeddings = cached.embeddings;
+        await closeLbug();
+      }
     } catch (err: any) {
       // Surface cache-load failures explicitly: silently swallowing here would
       // re-introduce the original silent-data-loss symptom (embeddings end up
@@ -477,10 +501,12 @@ export async function runFullAnalysis(
       );
       cachedEmbeddingNodeIds = new Set<string>();
       cachedEmbeddings = [];
-      try {
-        await closeLbug();
-      } catch {
-        /* swallow */
+      if (!embeddingVectorStore) {
+        try {
+          await closeLbug();
+        } catch {
+          /* swallow */
+        }
       }
     }
   }
@@ -794,16 +820,29 @@ export async function runFullAnalysis(
         cachedEmbeddingNodeIds = new Set();
       } else {
         progress('embeddings', 88, `Restoring ${cachedEmbeddings.length} cached embeddings...`);
-        const { batchInsertEmbeddings: batchInsert } =
-          await import('./embeddings/embedding-pipeline.js');
-        const EMBED_BATCH = 200;
-        for (let i = 0; i < cachedEmbeddings.length; i += EMBED_BATCH) {
-          const batch = cachedEmbeddings.slice(i, i + EMBED_BATCH);
-
+        if (embeddingVectorStore) {
+          // Milvus mode: restore cached embeddings to the per-repo collection
           try {
-            await batchInsert(executeWithReusedStatement, batch);
+            const records = cachedEmbeddings.map((e) => ({
+              ...e,
+              id: `${e.nodeId}:${e.chunkIndex}`,
+            }));
+            await embeddingVectorStore.insert(records);
           } catch {
             /* some may fail if node was removed, that's fine */
+          }
+        } else {
+          const { batchInsertEmbeddings: batchInsert } =
+            await import('./embeddings/embedding-pipeline.js');
+          const EMBED_BATCH = 200;
+          for (let i = 0; i < cachedEmbeddings.length; i += EMBED_BATCH) {
+            const batch = cachedEmbeddings.slice(i, i + EMBED_BATCH);
+
+            try {
+              await batchInsert(executeWithReusedStatement, batch);
+            } catch {
+              /* some may fail if node was removed, that's fine */
+            }
           }
         }
       }
@@ -858,20 +897,7 @@ export async function runFullAnalysis(
       }
 
       const { readServerMapping } = await import('./embeddings/server-mapping.js');
-      // Mirror the registry's name-resolution chain so the server-mapping
-      // lookup key stays aligned with the final registry name (#1259):
-      //   --name → remote-derived → canonical-root basename
-      // (preserved-alias is intentionally NOT consulted here — server
-      // mappings are addressed by the operationally-meaningful name the
-      // user configures, not by a sticky registry-only alias they may not
-      // know about. The previous canonical-only logic ignored both --name
-      // and remote-derived names, silently breaking server-mapping for
-      // anyone with a `--name` alias or remote-named repo.)
-      const projectName =
-        options.registryName ??
-        getInferredRepoName(repoPath) ??
-        path.basename(resolveRepoIdentityRoot(repoPath));
-      const serverName = await readServerMapping(projectName);
+      const serverName = await readServerMapping(resolvedRepoName);
       const embeddingResult = await runEmbeddingPipeline(
         executeQuery,
         executeWithReusedStatement,
@@ -887,8 +913,9 @@ export async function runFullAnalysis(
         },
         {},
         cachedEmbeddingNodeIds.size > 0 ? cachedEmbeddingNodeIds : undefined,
-        { repoName: projectName, serverName },
+        { repoName: resolvedRepoName, serverName },
         existingEmbeddings,
+        embeddingVectorStore,
       );
       if (embeddingResult.semanticMode === 'exact-scan') {
         semanticMode = 'exact-scan';
@@ -906,14 +933,19 @@ export async function runFullAnalysis(
 
     // Count embeddings in the index (cached + newly generated)
     let embeddingCount = 0;
-    try {
-      const embResult = await executeQuery(
-        `MATCH (e:${EMBEDDING_TABLE_NAME}) RETURN count(e) AS cnt`,
-      );
-      const row = embResult?.[0];
-      embeddingCount = Number(row?.cnt ?? row?.[0] ?? 0);
-    } catch {
-      /* table may not exist if embeddings never ran */
+    if (embeddingVectorStore) {
+      // Milvus mode: count from the per-repo collection
+      embeddingCount = await embeddingVectorStore.count(resolvedRepoName);
+    } else {
+      try {
+        const embResult = await executeQuery(
+          `MATCH (e:${EMBEDDING_TABLE_NAME}) RETURN count(e) AS cnt`,
+        );
+        const row = embResult?.[0];
+        embeddingCount = Number(row?.cnt ?? row?.[0] ?? 0);
+      } catch {
+        /* table may not exist if embeddings never ran */
+      }
     }
 
     if (!embeddingSkipped && stats.nodes > 0 && embeddingCount === 0) {

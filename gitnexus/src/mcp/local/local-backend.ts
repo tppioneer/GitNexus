@@ -48,6 +48,7 @@ import {
   getExactScanLimit,
   isVectorExtensionSupportedByPlatform,
 } from '../../core/platform/capabilities.js';
+import type { VectorStore } from '../../core/embeddings/vector-store.js';
 import { PhaseTimer } from '../../core/search/phase-timer.js';
 import { checkStalenessAsync, checkCwdMatch } from '../../core/git-staleness.js';
 import { logger } from '../../core/logger.js';
@@ -440,21 +441,9 @@ export class LocalBackend {
   private reinitPromises: Map<string, Promise<void>> = new Map();
   private lastStalenessCheck: Map<string, number> = new Map();
   private groupToolSvc: GroupService | null = null;
-  /**
-   * One-shot stderr warnings for sibling-clone drift, keyed by
-   * `${repoId}|${cwdGitRoot}`. Without this guard every tool call
-   * from inside a sibling clone would print the same warning,
-   * making MCP stderr unreadable.
-   */
   private warnedSiblingDrift: Set<string> = new Set();
-
-  /**
-   * One-shot stderr warning for the VECTOR-extension fallback. Without this
-   * guard the diagnostic would fire on every `semanticSearch()` call on
-   * platforms where the extension is unsupported (e.g. Windows), making MCP
-   * stderr noisy per DoD §2.8.
-   */
   private warnedVectorUnsupported = false;
+  private vectorStore: VectorStore | undefined;
 
   /**
    * Cross-repo group tools (CLI). Shares logic with MCP `group_*` handlers.
@@ -475,7 +464,15 @@ export class LocalBackend {
 
   /** Close all pooled LadybugDB connections (CLI one-shot; optional for long-lived MCP). */
   async dispose(): Promise<void> {
+    if (this.vectorStore) {
+      await this.vectorStore.dispose();
+    }
     await closeLbug();
+  }
+
+  /** Inject a VectorStore for Milvus or other backends. */
+  setVectorStore(vs: VectorStore | undefined): void {
+    this.vectorStore = vs;
   }
 
   // ─── Initialization ──────────────────────────────────────────────
@@ -485,6 +482,30 @@ export class LocalBackend {
    * Returns true if at least one repo is available.
    */
   async init(): Promise<boolean> {
+    // Initialize VectorStore from env vars (Milvus or default Kuzu).
+    // Must happen before any semanticSearch call so the query path finds it.
+    if (!this.vectorStore) {
+      try {
+        const { resolveVectorStoreConfig } = await import(
+          '../../core/embeddings/vector-store-config.js'
+        );
+        const { createVectorStore } = await import(
+          '../../core/embeddings/vector-store-factory.js'
+        );
+        const config = resolveVectorStoreConfig();
+        if (config.kind === 'milvus') {
+          this.vectorStore = await createVectorStore(config);
+          logger.info({ address: config.address }, 'GitNexus: Milvus vector store connected');
+        }
+      } catch (err) {
+        // Milvus SDK not installed or connection failed —
+        // degrade gracefully, exact-scan fallback handles search.
+        logger.warn(
+          { err },
+          'GitNexus: Milvus vector store init failed, semantic search will use exact scan',
+        );
+      }
+    }
     await this.refreshRepos();
     return this.repos.size > 0;
   }
@@ -1607,6 +1628,14 @@ export class LocalBackend {
    */
   private async semanticSearch(repo: RepoHandle, query: string, limit: number): Promise<any[]> {
     try {
+      if (this.vectorStore) {
+        const { embedQuery } = await import('../core/embedder.js');
+        const queryVec = await embedQuery(query);
+        const results = await this.vectorStore.search(queryVec, limit, repo.name, 0.6);
+        if (results.length === 0) return [];
+        return await this.enrichSearchResults(repo, results, limit);
+      }
+
       // Check if embedding table exists before loading the model (avoids heavy model init when embeddings are off)
       const tableCheck = await executeQuery(
         repo.lbugPath,
@@ -1650,10 +1679,6 @@ export class LocalBackend {
           bestChunks = new Map();
         }
       } else if (!this.warnedVectorUnsupported) {
-        // Rare diagnostic: surface why we fell back to the exact scan path so
-        // operators can see at a glance that VECTOR is disabled by platform
-        // policy. Emitted once per `LocalBackend` instance lifetime to avoid
-        // noisy stderr on hot semantic-search paths (DoD §2.8).
         this.warnedVectorUnsupported = true;
         logger.warn(
           'GitNexus [query:vector]: VECTOR extension not supported on this platform; using exact scan fallback',
@@ -1731,6 +1756,47 @@ export class LocalBackend {
       // Expected when embeddings are disabled — silently fall back to BM25-only
       return [];
     }
+  }
+
+  /**
+   * Enrich vector search results with metadata from LadybugDB
+   */
+  private async enrichSearchResults(
+    repo: RepoHandle,
+    results: import('../../core/embeddings/vector-store.js').VectorSearchResult[],
+    limit: number,
+  ): Promise<any[]> {
+    const enriched: any[] = [];
+
+    for (const chunk of results.slice(0, limit)) {
+      const labelEndIdx = chunk.nodeId.indexOf(':');
+      const label = labelEndIdx > 0 ? chunk.nodeId.substring(0, labelEndIdx) : 'Unknown';
+
+      if (!VALID_NODE_LABELS.has(label)) continue;
+
+      try {
+        const nodeQuery =
+          label === 'File'
+            ? `MATCH (n:File {id: $nodeId}) RETURN n.name AS name, n.filePath AS filePath`
+            : `MATCH (n:\`${label}\` {id: $nodeId}) RETURN n.name AS name, n.filePath AS filePath`;
+
+        const nodeRows = await executeParameterized(repo.lbugPath, nodeQuery, { nodeId: chunk.nodeId });
+        if (nodeRows.length > 0) {
+          const nodeRow = nodeRows[0];
+          enriched.push({
+            nodeId: chunk.nodeId,
+            name: nodeRow.name ?? nodeRow[0] ?? '',
+            type: label,
+            filePath: nodeRow.filePath ?? nodeRow[1] ?? '',
+            distance: chunk.distance,
+            startLine: chunk.startLine,
+            endLine: chunk.endLine,
+          });
+        }
+      } catch {}
+    }
+
+    return enriched;
   }
 
   async executeCypher(
