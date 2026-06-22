@@ -60,7 +60,7 @@
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@scarf/scarf": "^1.4.0",
     "busboy": "^1.6.0",
-    "@zilliz/milvus2-sdk-node": "^3.0.3",
+    "@zilliz/milvus2-sdk-node": "^2.6.9",
     "cli-progress": "^3.12.0",
     "commander": "^14.0.3",
     "cors": "^2.8.5",
