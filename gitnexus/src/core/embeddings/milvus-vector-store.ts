@@ -11,34 +11,50 @@ import { logger } from '../logger.js';
 /** Escape double-quotes in a string for use in Milvus filter expressions. */
 const escapeExpr = (s: string): string => s.replace(/"/g, '\\"');
 
+interface MilvusField {
+  name: string;
+  data_type: string;
+  is_primary_key?: boolean;
+  autoID?: boolean;
+  type_params?: Record<string, string | number>;
+}
+
 interface MilvusClient {
+  /** Promise that resolves once the gRPC connection is ready. */
+  connectPromise: Promise<void>;
   hasCollection: (params: { collection_name: string }) => Promise<{ value: boolean }>;
+  /** v2.6.x: custom schema uses `schema` (not `fields`). */
   createCollection: (params: {
     collection_name: string;
-    fields: Array<{
-      name: string;
-      data_type: string;
-      is_primary_key?: boolean;
-      autoID?: boolean;
-      dim?: number;
-      max_length?: number;
+    schema: MilvusField[];
+    enable_dynamic_field?: boolean;
+    index_params?: Array<{
+      field_name: string;
+      index_name: string;
+      index_type: string;
+      metric_type: string;
+      params?: Record<string, unknown>;
     }>;
   }) => Promise<any>;
   createIndex: (params: {
     collection_name: string;
     field_name: string;
     index_name: string;
-    params: Record<string, unknown>;
+    index_type: string;
+    metric_type: string;
+    params?: Record<string, unknown>;
   }) => Promise<any>;
   loadCollectionSync: (params: { collection_name: string }) => Promise<any>;
   insert: (params: { collection_name: string; data: Record<string, unknown>[] }) => Promise<any>;
+  /** v2.6.x: scalar filter uses `filter` (not `expr`). */
   delete: (params: { collection_name: string; filter: string }) => Promise<any>;
+  /** v2.6.x: `data` is number[] | number[][]. Single vector = flat number[]. */
   search: (params: {
     collection_name: string;
-    vector: number[];
+    data: number[] | number[][];
     limit: number;
     output_fields: string[];
-    params: Record<string, unknown>;
+    params?: Record<string, unknown>;
   }) => Promise<{ results: Array<Record<string, unknown> & { score?: number }> }>;
   query: (params: {
     collection_name: string;
@@ -74,6 +90,11 @@ export class MilvusVectorStore implements VectorStore {
     if (this.config.username) cfg.username = this.config.username;
     if (this.config.password) cfg.password = this.config.password;
     this.client = new MC(cfg) as unknown as MilvusClient;
+    // v2.6.x MilvusClient lazily connects; must explicitly await the connection
+    // before any gRPC calls, otherwise they fail with "collection not loaded"
+    // or hang indefinitely.
+    await this.client.connectPromise;
+    this._ready = true;
     return this.client;
   }
 
@@ -101,22 +122,46 @@ export class MilvusVectorStore implements VectorStore {
     if (!exists.value) {
       await client.createCollection({
         collection_name: colName,
-        fields: [
-          { name: 'id', data_type: 'VarChar', is_primary_key: true, max_length: 256 },
-          { name: 'nodeId', data_type: 'VarChar', max_length: 512 },
+        schema: [
+          {
+            name: 'id',
+            data_type: 'VarChar',
+            is_primary_key: true,
+            type_params: { max_length: '256' },
+          },
+          {
+            name: 'nodeId',
+            data_type: 'VarChar',
+            type_params: { max_length: '512' },
+          },
           { name: 'chunkIndex', data_type: 'Int32' },
           { name: 'startLine', data_type: 'Int64' },
           { name: 'endLine', data_type: 'Int64' },
-          { name: 'contentHash', data_type: 'VarChar', max_length: 64 },
-          { name: 'embedding', data_type: 'FloatVector', dim: this.config.dims },
+          {
+            name: 'contentHash',
+            data_type: 'VarChar',
+            type_params: { max_length: '64' },
+          },
+          {
+            name: 'embedding',
+            data_type: 'FloatVector',
+            type_params: { dim: String(this.config.dims) },
+          },
+        ],
+        // v2.6.x: index_params at creation time auto-loads the collection.
+        index_params: [
+          {
+            field_name: 'embedding',
+            index_name: 'embedding_idx',
+            index_type: 'HNSW',
+            metric_type: 'COSINE',
+            params: { M: 16, efConstruction: 200 },
+          },
         ],
       });
-      await client.createIndex({
-        collection_name: colName,
-        field_name: 'embedding',
-        index_name: 'embedding_idx',
-        params: { metric_type: 'COSINE', index_type: 'HNSW', M: 16, efConstruction: 200 },
-      });
+    } else {
+      // Collection exists but may not be loaded (e.g. after Milvus restart).
+      // loadCollectionSync is idempotent — no-op if already loaded.
       await client.loadCollectionSync({ collection_name: colName });
     }
     this._ensuredCollections.add(colName);
@@ -149,9 +194,12 @@ export class MilvusVectorStore implements VectorStore {
     const rn = this.requireRepoName(repoName);
     const colName = repoCollectionName(this.config.collectionName, rn);
     const client = await this.getClient();
+    // If the collection was never created (e.g. first-run skipped embeddings),
+    // there's nothing to delete.
+    const exists = await client.hasCollection({ collection_name: colName });
+    if (!exists.value) return;
     const ids = nodeIds.map((id) => `"${escapeExpr(id)}"`).join(', ');
     const filter = `nodeId in [${ids}]`;
-    // Milvus SDK v3 uses `filter` (not `expr`) in the delete method
     await client.delete({ collection_name: colName, filter });
     await client.flushSync({ collection_names: [colName] });
   }
@@ -174,10 +222,10 @@ export class MilvusVectorStore implements VectorStore {
     const client = await this.getClient();
     const result = await client.search({
       collection_name: colName,
-      vector: queryVector,
+      // v2.6.x: flat number[] for single-vector search (number[][] for batch)
+      data: queryVector,
       limit: topK,
       output_fields: ['nodeId', 'chunkIndex', 'startLine', 'endLine'],
-      params: { metric_type: 'COSINE', ef: 64 },
     });
     return (result.results ?? [])
       .filter((r) => (r.score ?? 0) >= 1 - maxDistance)
@@ -194,7 +242,9 @@ export class MilvusVectorStore implements VectorStore {
     const rn = this.requireRepoName(repoName);
     const colName = repoCollectionName(this.config.collectionName, rn);
     const client = await this.getClient();
-    // Milvus SDK v3 returns { data: number } directly (not array-of-object)
+    const exists = await client.hasCollection({ collection_name: colName });
+    if (!exists.value) return 0;
+    // v2.6.x count returns { data: number }; also handle array-of-object fallback
     const result = await client.count({ collection_name: colName });
     const d = result.data as unknown;
     if (typeof d === 'number') return d;
