@@ -64,6 +64,9 @@ function getNextStepHint(toolName: string, args: Record<string, any> | undefined
     case 'cypher':
       return `\n\n---\n**Next:** To explore a result symbol, use context({name: "<name>"${repoParam}}). For schema reference, READ gitnexus://repo/${repoPath}/schema.`;
 
+    case 'read_remote_file':
+      return `\n\n---\n**Next:** To dive deeper into symbols found in this file, use context({name: "<symbol>"${repoParam}}). To assess the blast radius of planned changes, use impact({target: "<symbol>", direction: "upstream"${repoParam}}).`;
+
     // Legacy tool names — still return useful hints
     case 'search':
       return `\n\n---\n**Next:** To understand a result in context, use context({name: "<symbol_name>"${repoParam}}).`;
