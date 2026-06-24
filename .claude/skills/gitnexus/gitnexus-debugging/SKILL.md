@@ -97,5 +97,6 @@ When no path exists, `trace` reports the furthest reachable node — exactly whe
 3. READ gitnexus://repo/my-app/process/CheckoutFlow
    → Step 3: validatePayment → calls fetchRates (external)
 
-4. Root cause: fetchRates calls external API without proper timeout
+4. Read src/payments/processor.ts for implementation details
+   → fetchRates has no timeout configured → root cause confirmed
 ```

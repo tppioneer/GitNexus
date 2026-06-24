@@ -1,9 +1,9 @@
 ---
 name: gitnexus-debugging-zh
-description: "当用户在调试 Bug、追踪错误或问为什么某段代码失败时使用。示例：\"为什么 X 失败了？\"、\"这个错误从哪来的？\"、\"追踪这个 Bug\""
+description: "当用户在调试 Bug、追踪错误或问为什么某段代码失败时使用（远程模式）。示例：\"为什么 X 失败了？\"、\"这个错误从哪来的？\"、\"追踪这个 Bug\""
 ---
 
-# 用 GitNexus 调试
+# 用 GitNexus 调试（远程模式）
 
 ## 适用场景
 
@@ -11,29 +11,33 @@ description: "当用户在调试 Bug、追踪错误或问为什么某段代码�
 - "追踪这个错误从哪来的"
 - "谁调用了这个方法？"
 - "这个接口返回 500"
-- 排查 Bug、错误、意外行为
+
+## 远程模式须知
+
+知识图谱是你的调试入口——通过调用链和执行流定位根因。图谱返回的文件路径指向服务端，调试阶段用它给出的调用关系、执行流和符号上下文完成推理。定位到根因后可自由操作本地文件来修复。
+
+> "Index is stale" → 联系服务端管理员触发 CI 索引更新。
 
 ## 工作流
 
 ```
-1. query({search_query: "<错误信息或症状>"})              → 找到相关执行流
-2. context({name: "<可疑符号>"})                  → 查看调用者/被调用者/执行流
-3. READ gitnexus://repo/{name}/process/{name}              → 追踪执行流
-4. cypher({statement: "MATCH path..."})               → 需要时自定义路径查询
+1. query({search_query: "<错误或症状>", repo: "<仓库名>"})   → 找到相关执行流
+2. context({name: "<可疑符号>", repo: "<仓库名>"})   → 查看调用者/被调用者
+3. READ gitnexus://repo/{name}/process/{name}                → 追踪执行流
+4. trace({from: "A", to: "B", repo: "<仓库名>"})     → 最短调用路径
+5. cypher 自定义查询（如果需要）
 ```
-
-> "Index is stale" → 联系服务端管理员触发 CI 索引更新。远程模式下开发者无法本地执行 `analyze`。
 
 ## Checklist
 
 ```
-- [ ] 理解症状（错误消息、意外行为）
+- [ ] 理解症状
 - [ ] query 搜索错误文本或相关代码
 - [ ] 从返回的执行流中锁定可疑函数
 - [ ] context 查看调用者和被调用者
 - [ ] 如果涉及，通过 process 资源追踪执行流
-- [ ] cypher 自定义调用链追踪（如果需要）
-- [ ] 读源文件确认根因
+- [ ] trace 看最短调用路径
+- [ ] cypher 自定义查询（如果需要）
 ```
 
 ## 调试模式速查
@@ -78,15 +82,18 @@ trace({ from: "processCheckout", to: "fetchRates" })
 ## 示例："支付接口间歇性 500"
 
 ```
-1. query({search_query: "支付错误处理"})
+1. query({search_query: "支付错误处理", repo: "my-app"})
    → Processes: CheckoutFlow, ErrorHandling
    → Symbols: validatePayment, handlePaymentError
 
-2. context({name: "validatePayment"})
+2. context({name: "validatePayment", repo: "my-app"})
    → Outgoing calls: verifyCard, fetchRates（外部 API!）
 
-3. READ gitnexus://repo/my-app/process/CheckoutFlow
+3. trace({from: "validatePayment", to: "fetchRates", repo: "my-app"})
+   → validatePayment → verifyCard → fetchRates
+
+4. READ gitnexus://repo/my-app/process/CheckoutFlow
    → Step 3: validatePayment → 调用了 fetchRates（外部调用）
 
-4. 根因: fetchRates 调用外部 API 没有适当超时
+5. 根因: fetchRates 调用外部 API 没有适当超时
 ```
