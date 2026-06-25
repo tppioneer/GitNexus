@@ -494,4 +494,43 @@ WHEN TO USE: Discover groups before group_sync. Optional "name" returns a single
       required: [],
     },
   },
+  {
+    name: 'read_remote_file',
+    description: `Read a source file from the indexed repository on the remote server.
+
+WHEN TO USE: The last step in the exploration workflow — after query() / context() / trace() identified relevant source files via the knowledge graph, use this tool to read their implementation details. The graph tells you WHERE the code is; read_remote_file lets you read WHAT it says.
+
+Returns the file content as a Markdown code block with line numbers. Use start_line / end_line to limit output for large files.
+
+AFTER THIS: Use context() to dive deeper into symbols found in the file, or impact() to assess the blast radius of planned changes.`,
+    annotations: READ_ONLY_TOOL_ANNOTATIONS,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file_path: {
+          type: 'string',
+          description:
+            'Relative file path within the repository (e.g., "src/payments/processor.ts"). Must point to a file inside the indexed repo.',
+        },
+        repo: {
+          type: 'string',
+          description:
+            'Repository name or path. Omit when only one repo is indexed.',
+        },
+        start_line: {
+          type: 'integer',
+          minimum: 1,
+          description:
+            'First line to return (1-based, inclusive). Omit to start from line 1.',
+        },
+        end_line: {
+          type: 'integer',
+          minimum: 1,
+          description:
+            'Last line to return (1-based, inclusive). Omit to read to end of file.',
+        },
+      },
+      required: ['file_path'],
+    },
+  },
 ];

@@ -89,6 +89,7 @@ import {
   type PdgBridgeEvidenceInfo,
   type PdgLayerStatus,
 } from './pdg-impact.js';
+import { readRemoteFileContent } from '../../core/extra-tool/read-remote-file.js';
 
 /** Real source-file extensions (`.ts`, `.py`, …) from the resolver's list,
  *  excluding the empty entry and the `/index.*` forms — used to decide whether
@@ -1356,6 +1357,23 @@ export class LocalBackend {
       return this.callToolAtGroupRepo(method, p);
     }
 
+    // read_remote_file does not support group mode — source files belong
+    // to a specific indexed repository, not a cross-repo group abstraction.
+    // Catch this before resolveRepo() so the user sees a clear error instead
+    // of a confusing "repo not found" message.
+    if (
+      method === 'read_remote_file' &&
+      typeof p.repo === 'string' &&
+      p.repo.startsWith('@')
+    ) {
+      return {
+        error:
+          'read_remote_file does not support group mode (@groupName). ' +
+          'Source-file reading requires a specific indexed repository. ' +
+          'Use a repository name directly (e.g., repo: "my-repo") instead of a group name.',
+      };
+    }
+
     // Resolve repo from optional param (re-reads registry on miss). An optional
     // `branch` param scopes the resolved handle to that branch's index (#2106).
     const repoParams = params as { repo?: string; branch?: string } | undefined;
@@ -1399,6 +1417,8 @@ export class LocalBackend {
         return this.apiImpact(repo, params);
       case 'trace':
         return this.trace(repo, params);
+      case 'read_remote_file':
+        return readRemoteFileContent(repo.repoPath, params);
       default:
         throw new Error(`Unknown tool: ${method}`);
     }

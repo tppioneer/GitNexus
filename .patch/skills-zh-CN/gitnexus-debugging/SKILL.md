@@ -14,7 +14,7 @@ description: "当用户在调试 Bug、追踪错误或问为什么某段代码�
 
 ## 远程模式须知
 
-知识图谱是你的调试入口——通过调用链和执行流定位根因。图谱返回的文件路径指向服务端，调试阶段用它给出的调用关系、执行流和符号上下文完成推理。定位到根因后可自由操作本地文件来修复。
+知识图谱是你的调试入口——通过调用链和执行流定位根因。图谱返回的文件路径指向服务端，调试阶段用图谱工具完成推理，然后用 `read_remote_file` 阅读可疑源码确认根因。确认后可自由操作本地文件来修复。
 
 > "Index is stale" → 联系服务端管理员触发 CI 索引更新。
 
@@ -26,6 +26,7 @@ description: "当用户在调试 Bug、追踪错误或问为什么某段代码�
 3. READ gitnexus://repo/{name}/process/{name}                → 追踪执行流
 4. trace({from: "A", to: "B", repo: "<仓库名>"})     → 最短调用路径
 5. cypher 自定义查询（如果需要）
+6. read_remote_file({file_path: "<路径>"})           → 阅读可疑源码确认根因
 ```
 
 ## Checklist
@@ -38,6 +39,7 @@ description: "当用户在调试 Bug、追踪错误或问为什么某段代码�
 - [ ] 如果涉及，通过 process 资源追踪执行流
 - [ ] trace 看最短调用路径
 - [ ] cypher 自定义查询（如果需要）
+- [ ] read_remote_file 阅读可疑源码确认根因
 ```
 
 ## 调试模式速查
@@ -79,6 +81,16 @@ trace({ from: "processCheckout", to: "fetchRates" })
 → edges: CALLS (1.0), CALLS (0.95), CALLS (1.0)
 ```
 
+**read_remote_file** —— 阅读图谱定位到的可疑源码文件：
+
+```
+read_remote_file({file_path: "src/services/fetchRates.ts", repo: "my-app"})
+→ 返回带行号的 Markdown 代码块
+
+read_remote_file({file_path: "src/large-handler.ts", start_line: 80, end_line: 150, repo: "my-app"})
+→ 只返回第 80-150 行，聚焦关键逻辑
+```
+
 ## 示例："支付接口间歇性 500"
 
 ```
@@ -95,5 +107,8 @@ trace({ from: "processCheckout", to: "fetchRates" })
 4. READ gitnexus://repo/my-app/process/CheckoutFlow
    → Step 3: validatePayment → 调用了 fetchRates（外部调用）
 
-5. 根因: fetchRates 调用外部 API 没有适当超时
+5. read_remote_file({file_path: "src/services/fetchRates.ts", repo: "my-app"})
+   → 确认 fetchRates 实现中 fetch() 调用确实没有配置 timeout
+
+6. 根因: fetchRates 调用外部 API 没有适当超时
 ```

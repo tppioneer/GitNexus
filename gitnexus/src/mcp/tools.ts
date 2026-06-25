@@ -828,6 +828,10 @@ Returns: ordered hops with file:line, and an aligned edges[] of edge type + conf
 import { RECOMMEND_REPO_TOOL } from '../core/repo-index/tool-def.js';
 GITNEXUS_TOOLS.push(RECOMMEND_REPO_TOOL);
 
+// Extra tools registered from core/extra-tool/ — self-contained definitions.
+import { READ_REMOTE_FILE_TOOL } from '../core/extra-tool/index.js';
+GITNEXUS_TOOLS.push(READ_REMOTE_FILE_TOOL);
+
 /**
  * Per-repo tools that accept an optional `branch` scope (#2106). Single source
  * of truth: the schema property is injected here so it cannot drift from the
@@ -850,6 +854,7 @@ const BRANCH_SCOPED_TOOLS = new Set([
   'shape_check',
   'api_impact',
   'trace',
+  'read_remote_file',
 ]);
 
 for (const tool of GITNEXUS_TOOLS) {

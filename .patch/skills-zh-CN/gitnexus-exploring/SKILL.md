@@ -18,7 +18,7 @@ description: "当用户询问代码如何工作、想理解架构、追踪执行
 
 | 概念 | 说明 |
 |------|------|
-| **图谱返回的文件路径指向服务端** | 探索阶段不要用 `Read` 去验证图谱结果——源文件在远程服务器上，本地不一定有。知识图谱本身就是权威信息来源 |
+| **图谱返回的文件路径指向服务端** | 探索阶段用 `read_remote_file` 阅读源码实现，不要用本地 `Read` 去验证图谱结果——源文件在远程服务器上，本地不一定有 |
 | **知识图谱是团队的共享地图** | 索引由服务端定期维护，反映基准分支 `develop` 的代码结构 |
 | **多仓库需带 `repo` 参数** | 远程服务器可能索引了多个仓库，`query`/`context`/`impact` 必须指明 `repo` |
 | **`service` 参数用于微服务/大仓** | monorepo 用 `service` 限定到特定子项目 |
@@ -33,6 +33,7 @@ description: "当用户询问代码如何工作、想理解架构、追踪执行
 4. query({search_query: "<概念>", repo: "<仓库名>"}) → 找到相关执行流
 5. context({name: "<符号名>", repo: "<仓库名>"})     → 深入看具体符号
 6. READ gitnexus://repo/{name}/process/{name}        → 追踪完整执行流
+7. read_remote_file({file_path: "<路径>"})           → 阅读图谱定位到的源码实现
 ```
 
 > 步骤 2 提示"Index is stale"→ 联系服务端管理员触发 CI 索引更新。
@@ -47,6 +48,7 @@ description: "当用户询问代码如何工作、想理解架构、追踪执行
 | "这个函数被谁调用了？" | `context({name: "函数名"})` |
 | "这两个函数之间的调用链？" | `trace({from: "A", to: "B"})` |
 | "整个执行流逐步骤" | READ `process/{name}` |
+| "这个函数的具体代码是怎么写的？" | `read_remote_file({file_path: "src/..."})` |
 | "这个模块有哪些文件和类？" | READ `cluster/{name}` |
 
 ## Checklist
@@ -60,6 +62,7 @@ description: "当用户询问代码如何工作、想理解架构、追踪执行
 - [ ] context 看关键符号的调用者/被调用者
 - [ ] trace 看两个符号之间的最短路径（如果需要）
 - [ ] READ process 资源获取逐步执行路径
+- [ ] read_remote_file 阅读关键源文件的实现细节
 - [ ] 用 `context`、`trace`、`query` 继续深挖，图谱已有全部结构信息
 - [ ] 理解完成后，可自由 `Read`/`Edit` 你自己的本地文件来实现修改方案（skill 内的限制仅适用于验证图谱结果的阶段）
 ```
@@ -116,6 +119,16 @@ MATCH (caller)-[:CodeRelation {type: 'CALLS'}]->(f:Function {name: "validateUser
 RETURN caller.name, caller.filePath
 ```
 
+**read_remote_file** —— 从远程服务器读取索引仓库中的源文件（图谱探索的最后一步）：
+
+```
+read_remote_file({file_path: "src/payments/processor.ts", repo: "my-app"})
+→ 返回带行号的 Markdown 代码块
+
+read_remote_file({file_path: "src/large-module.ts", start_line: 50, end_line: 120, repo: "my-app"})
+→ 只返回第 50-120 行，避免大文件 token 溢出
+```
+
 ## 示例："支付处理是怎么实现的？"
 
 ```
@@ -139,15 +152,18 @@ RETURN caller.name, caller.filePath
 
 7. 用 context 深入看 fetchRates 在 shared-lib 中的入/出引用
    → 发现它依赖了一个外部汇率 API 的 HTTP 调用
+
+8. read_remote_file({file_path: "src/payments/processor.ts", repo: "my-app"})
+   → 阅读 processPayment 的完整实现代码
 ```
 
 ## 陷阱与提示
 
-> **⚠️ 探索阶段：不要用 `Read` 去验证图谱返回的文件路径。** 源文件在远程服务器上，图谱本身就是权威信息来源——用 `context`、`trace`、`process` 完成全部理解。**这条限制只作用于探索验证步骤：你仍然可以自由 `Read`/`Edit` 你自己的本地仓库来写代码。**
+> **⚠️ 探索阶段：用 `read_remote_file` 阅读远程源码，不要用本地 `Read` 去验证图谱路径。** 源文件在远程服务器上，用 `read_remote_file` 工具来阅读实现细节；`context`、`trace`、`process` 用于理解结构和关系。**这条限制只作用于探索验证步骤：你仍然可以自由 `Read`/`Edit` 你自己的本地仓库来写代码。**
 
 | 陷阱 | 提示 |
 |------|------|
-| 想去看源文件验证图谱结果 | 不用。用 `context({name})` 看关系图、`trace` 追调用链、`process` 看执行流 |
+| 想去看源文件验证图谱结果 | 用 `read_remote_file({file_path})` 阅读远程源码实现 |
 | 结果命中了不认识的符号 | 继续用 `context({name})` 展开它 |
 | context 返回 ambiguous | 用 `file_path` 或 `uid` 消歧 |
 | trace 返回 no_path | 链条在动态调用/反射/外部 API 处断了——用 context 手动跳 |
