@@ -1,5 +1,5 @@
 ---
-name: gitnexus-refactoring-local-zh
+name: gitnexus-refactoring-local
 description: "当用户想要安全地重命名、提取、拆分、移动或重构代码时使用（本地模式）。示例：\"重命名这个函数\"、\"把这个提取成模块\"、\"重构这个类\"、\"把这个移到单独文件\""
 ---
 

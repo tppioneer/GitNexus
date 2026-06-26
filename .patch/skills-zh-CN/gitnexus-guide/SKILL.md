@@ -1,5 +1,5 @@
 ---
-name: gitnexus-guide-zh
+name: gitnexus-guide
 description: "当用户询问 GitNexus 本身（远程团队模式）——可用工具、如何查询知识图谱、MCP 资源、图 schema 或工作流参考时使用。"
 ---
 

@@ -1,3 +1,22 @@
+/**
+ * Compatible stdio transport with dual-framing support.
+ *
+ * The MCP protocol specifies two stdio wire formats:
+ * - **newline-delimited**: each JSON-RPC message is a single line terminated
+ *   by `\n`. The first byte (`{` or `[`) is used to auto-detect this mode.
+ * - **Content-Length header**: messages are prefixed with a `Content-Length:
+ *   <N>` header followed by `\r\n\r\n` separator, then the JSON body of N
+ *   bytes. This is the format used by Claude Code and most modern MCP clients.
+ *
+ * This transport auto-detects the framing on the first received message and
+ * uses the same framing for all subsequent outbound messages, ensuring
+ * compatibility with both legacy (newline) and modern (Content-Length) clients.
+ * Message size is capped at `MAX_BUFFER_SIZE` (10 MiB) in both directions.
+ *
+ * Based on the MCP SDK's `StdioServerTransport` with added dual-framing
+ * detection and Windows compatibility fixes.
+ */
+
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { JSONRPCMessageSchema, type JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 

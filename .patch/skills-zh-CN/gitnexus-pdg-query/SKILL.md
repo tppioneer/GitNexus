@@ -1,5 +1,5 @@
 ---
-name: gitnexus-pdg-query-zh
+name: gitnexus-pdg-query
 description: "当查询或扩展 GitNexus 的 PDG 控制/数据依赖面（pdg_query MCP 工具、CDG/REACHING_DEF 边）时使用。需 `analyze --pdg`。"
 ---
 

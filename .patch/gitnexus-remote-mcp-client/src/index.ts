@@ -1,5 +1,40 @@
 #!/usr/bin/env node
 
+/**
+ * GitNexus Remote MCP Client
+ *
+ * A stdio-to-HTTP proxy that connects a local AI agent (Claude Code, Cursor,
+ * etc.) to a remote GitNexus MCP server over Streamable HTTP.
+ *
+ * Purpose:
+ *   When the indexed codebase lives on a remote server (not the AI agent's
+ *   machine), this proxy bridges the gap: it speaks MCP stdio to the agent
+ *   and forwards every request to the remote GitNexus HTTP endpoint.
+ *   Tools are hardcoded in tools.ts (a curated subset of the server-side
+ *   GITNEXUS_TOOLS); unknown tools are rejected locally before hitting the
+ *   wire.
+ *
+ * Environment variables:
+ *   GITNEXUS_REMOTE_URL — remote GitNexus HTTP server base URL
+ *                         (falls back to http://localhost:4747/api/mcp)
+ *
+ * Usage:
+ *   # Direct invocation
+ *   gitnexus-remote-mcp-client --url http://192.168.1.100:4747/api/mcp
+ *
+ *   # Via environment variable
+ *   GITNEXUS_REMOTE_URL=http://server:4747/api/mcp gitnexus-remote-mcp-client
+ *
+ *   # In Claude Code mcp.json
+ *   {
+ *     "gitnexus-remote": {
+ *       "command": "node",
+ *       "args": [".patch/gitnexus-remote-mcp-client/dist/index.js",
+ *                "--url", "http://10.0.0.5:4747/api/mcp"]
+ *     }
+ *   }
+ */
+
 import { startProxyServer } from './proxy.js';
 
 const DEFAULT_URL = 'http://localhost:4747/api/mcp';

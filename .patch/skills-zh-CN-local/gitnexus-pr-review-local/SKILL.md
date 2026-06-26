@@ -1,5 +1,5 @@
 ---
-name: gitnexus-pr-review-local-zh
+name: gitnexus-pr-review-local
 description: "当用户想要审查 PR、理解 PR 改了什么、评估合并风险或检查测试覆盖时使用（本地模式）。示例：\"审查这个 PR\"、\"PR #42 改了哪些？\"、\"这个 PR 安全吗？\""
 ---
 

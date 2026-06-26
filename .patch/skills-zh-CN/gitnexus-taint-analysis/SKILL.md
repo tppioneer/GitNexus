@@ -1,5 +1,5 @@
 ---
-name: gitnexus-taint-analysis-zh
+name: gitnexus-taint-analysis
 description: "当操作、审查或扩展 GitNexus 的 CFG/污点/PDG 子系统（--pdg 层）时使用。需 `analyze --pdg`。"
 ---
 

@@ -1,5 +1,5 @@
 ---
-name: gitnexus-exploring-zh
+name: gitnexus-exploring
 description: "当用户询问代码如何工作、想理解架构、追踪执行流或探索不熟悉的代码部分时使用（远程模式）。示例：\"X 是怎么工作的？\"、\"谁调用了这个函数？\"、\"给我看认证流程\""
 ---
 
@@ -111,6 +111,8 @@ trace({from: "processCheckout", to: "fetchRates", repo: "my-app"})
 ```
 
 当路径不存在时，`trace` 显示最远可达的节点——精确指出调用链在哪里断的（动态分发、反射或外部边界）。
+
+**trace 失败兜底**：当 trace 返回 `no_path` 或 `ambiguous` 时，用 `read_remote_file` 打开 `furthest.filePath` 或候选符号的 `filePath` 查看源码，结合 `context` 和 `cypher`（找实现类）手动补全调用链。
 
 **cypher** —— 需要自定义查询时使用（先读 schema）：
 

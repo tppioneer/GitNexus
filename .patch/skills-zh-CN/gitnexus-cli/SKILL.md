@@ -1,5 +1,5 @@
 ---
-name: gitnexus-cli-zh
+name: gitnexus-cli
 description: "当用户需要了解 GitNexus CLI 命令时使用。远程模式下 CLI 由服务端管理员执行，开发者通常不需要运行这些命令。"
 ---
 

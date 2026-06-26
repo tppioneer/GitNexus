@@ -1,5 +1,5 @@
 ---
-name: gitnexus-guide-local-zh
+name: gitnexus-guide-local
 description: "当用户询问 GitNexus 本身（本地模式）——可用工具、如何查询知识图谱、MCP 资源、图 schema 或工作流参考时使用。示例：\"GitNexus 有哪些工具可用？\"、\"怎么用 GitNexus？\""
 ---
 

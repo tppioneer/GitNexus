@@ -1,5 +1,5 @@
 ---
-name: gitnexus-cli-local-zh
+name: gitnexus-cli-local
 description: "当用户需要运行 GitNexus CLI 命令（分析/索引仓库、检查状态、清理索引、生成 Wiki、列出已索引仓库）时使用。本地模式下 CLI 在开发者的机器上直接执行。"
 ---
 

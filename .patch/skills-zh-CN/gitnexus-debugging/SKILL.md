@@ -1,5 +1,5 @@
 ---
-name: gitnexus-debugging-zh
+name: gitnexus-debugging
 description: "当用户在调试 Bug、追踪错误或问为什么某段代码失败时使用（远程模式）。示例：\"为什么 X 失败了？\"、\"这个错误从哪来的？\"、\"追踪这个 Bug\""
 ---
 
@@ -80,6 +80,8 @@ trace({ from: "processCheckout", to: "fetchRates" })
 → hops: processCheckout → validatePayment → verifyCard → fetchRates
 → edges: CALLS (1.0), CALLS (0.95), CALLS (1.0)
 ```
+
+当 trace 返回 `no_path`（断链）或 `ambiguous`（重名）时，用 `read_remote_file` 打开 `furthest.filePath` 或候选符号源码，结合 `context`/`cypher` 手动补全调用链。
 
 **read_remote_file** —— 阅读图谱定位到的可疑源码文件：
 

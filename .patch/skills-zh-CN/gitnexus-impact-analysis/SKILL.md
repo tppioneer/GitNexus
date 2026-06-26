@@ -1,5 +1,5 @@
 ---
-name: gitnexus-impact-analysis-zh
+name: gitnexus-impact-analysis
 description: "当用户想知道改某个东西会破坏什么、或需要改代码前的安全分析时使用（远程模式）。示例：\"改 X 安全吗？\"、\"谁依赖这个？\"、\"会影响什么？\""
 ---
 

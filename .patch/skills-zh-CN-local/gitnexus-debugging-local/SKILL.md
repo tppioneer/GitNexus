@@ -1,5 +1,5 @@
 ---
-name: gitnexus-debugging-local-zh
+name: gitnexus-debugging-local
 description: "当用户在调试 Bug、追踪错误或问为什么某段代码失败时使用（本地模式）。示例：\"为什么 X 失败了？\"、\"这个错误从哪来的？\"、\"追踪这个 Bug\""
 ---
 

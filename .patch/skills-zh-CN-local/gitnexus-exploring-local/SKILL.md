@@ -1,5 +1,5 @@
 ---
-name: gitnexus-exploring-local-zh
+name: gitnexus-exploring-local
 description: "当用户询问代码如何工作、想理解架构、追踪执行流或探索不熟悉的代码部分时使用（本地模式）。示例：\"X 是怎么工作的？\"、\"谁调用了这个函数？\"、\"给我看认证流程\""
 ---
 

@@ -1,5 +1,5 @@
 ---
-name: gitnexus-pr-review-zh
+name: gitnexus-pr-review
 description: "当用户想要审查 PR、理解 PR 改了什么、评估合并风险或检查测试覆盖时使用（远程模式）。"
 ---
 

@@ -1,5 +1,5 @@
 ---
-name: gitnexus-refactoring-zh
+name: gitnexus-refactoring
 description: "当用户想要安全地重命名、提取、拆分、移动或重构代码时使用（远程模式）。需在有本地 clone 的前提下。"
 ---
 

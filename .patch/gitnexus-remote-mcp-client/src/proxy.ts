@@ -17,6 +17,26 @@ export interface ProxyServerOptions {
   remoteUrl: string;
 }
 
+/**
+ * Simple elapsed-time logger.
+ *
+ * Usage:
+ *   const done = _measure('callTool', { name: 'query' });
+ *   const result = await doWork();
+ *   done();  // writes "[proxy] callTool (name=query): 234ms"
+ */
+function _measure(
+  operation: string,
+  detail?: Record<string, unknown>,
+): () => void {
+  const start = performance.now();
+  const detailStr = detail ? ' ' + JSON.stringify(detail) : '';
+  return () => {
+    const elapsed = Math.round(performance.now() - start);
+    process.stderr.write(`[proxy] ${operation}${detailStr}: ${elapsed}ms\n`);
+  };
+}
+
 class ReconnectingClient {
   private _client: Client | null = null;
   private _transport: StreamableHTTPClientTransport | null = null;
@@ -158,6 +178,10 @@ class ReconnectingClient {
     return this._withReconnect((client) => client.callTool(params as any));
   }
 
+  async listTools() {
+    return this._withReconnect((client) => client.listTools());
+  }
+
   async listResources() {
     return this._withReconnect((client) => client.listResources());
   }
@@ -227,7 +251,8 @@ export async function startProxyServer(options: ProxyServerOptions): Promise<voi
   // ─── Tool handlers ──────────────────────────────────────────────
 
   localServer.setRequestHandler(ListToolsRequestSchema, async () => {
-    return {
+    const done = _measure('listTools', { toolCount: HARDCODED_TOOLS.length });
+    const result = {
       tools: HARDCODED_TOOLS.map((tool) => ({
         name: tool.name,
         description: tool.description,
@@ -235,13 +260,17 @@ export async function startProxyServer(options: ProxyServerOptions): Promise<voi
         annotations: tool.annotations,
       })),
     };
+    done();
+    return result;
   });
 
   localServer.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
+    const done = _measure('callTool', { name });
 
     const toolDef = HARDCODED_TOOLS.find((t) => t.name === name);
     if (!toolDef) {
+      done();
       return {
         content: [{
           type: 'text' as const,
@@ -253,12 +282,14 @@ export async function startProxyServer(options: ProxyServerOptions): Promise<voi
 
     try {
       const result = await remote.callTool({ name, arguments: args as Record<string, unknown> });
+      done();
       return {
         content: result.content as any,
         isError: result.isError,
         _meta: result._meta,
       };
     } catch (error: any) {
+      done();
       const message = error instanceof Error ? error.message : 'Unknown error';
       return {
         content: [{ type: 'text' as const, text: `Error: ${message}` }],
@@ -271,21 +302,28 @@ export async function startProxyServer(options: ProxyServerOptions): Promise<voi
 
   if (serverCapabilities?.resources) {
     localServer.setRequestHandler(ListResourcesRequestSchema, async () => {
+      const done = _measure('listResources');
       const result = await remote.listResources();
+      done();
       return { resources: result.resources };
     });
 
     localServer.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
+      const done = _measure('listResourceTemplates');
       const result = await remote.listResourceTemplates();
+      done();
       return { resourceTemplates: result.resourceTemplates };
     });
 
     localServer.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       const { uri } = request.params;
+      const done = _measure('readResource', { uri });
       try {
         const result = await remote.readResource({ uri });
+        done();
         return { contents: result.contents as any };
       } catch (error: any) {
+        done();
         const message = error instanceof Error ? error.message : 'Unknown error';
         return {
           contents: [{ uri, mimeType: 'text/plain' as const, text: `Error: ${message}` }],
@@ -298,13 +336,17 @@ export async function startProxyServer(options: ProxyServerOptions): Promise<voi
 
   if (serverCapabilities?.prompts) {
     localServer.setRequestHandler(ListPromptsRequestSchema, async () => {
+      const done = _measure('listPrompts');
       const result = await remote.listPrompts();
+      done();
       return { prompts: result.prompts };
     });
 
     localServer.setRequestHandler(GetPromptRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
+      const done = _measure('getPrompt', { name });
       const result = await remote.getPrompt({ name, arguments: args as Record<string, string> });
+      done();
       return {
         messages: result.messages as any,
         description: result.description,
