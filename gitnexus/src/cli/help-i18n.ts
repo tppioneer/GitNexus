@@ -148,6 +148,7 @@ const OPTION_DESCRIPTION_KEYS = {
   'group sync|--exact-only': 'help.option.group.sync.exactOnly',
   'group sync|--allow-stale': 'help.option.group.sync.allowStale',
   'group sync|--verbose': 'help.option.group.sync.verbose',
+  'group sync|--plugin <id>': 'help.option.group.sync.plugin',
   'group sync|--json': 'help.option.json',
   'group impact|--target <symbol>': 'help.option.group.impact.target',
   'group impact|--repo <groupPath>': 'help.option.group.impact.repo',

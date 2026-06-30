@@ -251,6 +251,7 @@ export const zhCN = {
   'help.option.group.sync.exactOnly': '仅精确匹配',
   'help.option.group.sync.allowStale': '跳过过期索引警告',
   'help.option.group.sync.verbose': '显示每条跨仓库链接详情',
+  'help.option.group.sync.plugin': '仅为本次同步启用一个内置 group-sync 插件',
   'help.option.json': 'JSON 输出',
   'help.option.group.impact.target': '要分析的符号或文件名',
   'help.option.group.impact.repo': 'group.yaml 中的成员路径（如 app/backend），不是已索引仓库名称',

@@ -66,6 +66,13 @@ describe('group CLI', () => {
     expect(source).not.toMatch(blanketClosePattern);
   });
 
+  it('exposes explicit plugin selection on group sync', () => {
+    const result = runGroup(['sync', '--help']);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('--plugin <id>');
+    expect(result.stdout).not.toContain('--no-plugins');
+  });
+
   it('group impact requires --target and --repo', () => {
     const c = runGroup(['create', 'impcli']);
     expect(c.status).toBe(0);
