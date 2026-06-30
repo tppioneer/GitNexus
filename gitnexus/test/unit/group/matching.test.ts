@@ -204,6 +204,28 @@ describe('runExactMatch', () => {
     expect(matched[0].to.repo).toBe('backend');
     expect(unmatched).toHaveLength(0);
   });
+
+  it('uses consumer serviceRef metadata to select the intended HTTP provider service', () => {
+    const contracts: StoredContract[] = [
+      {
+        ...makeContract('http::POST::/rest/v1/protected/batch', 'provider', 'demo-backend'),
+        meta: { serviceName: 'demo-service' },
+      },
+      {
+        ...makeContract('http::POST::/rest/v1/protected/batch', 'provider', 'other-backend'),
+        meta: { serviceName: 'other-service' },
+      },
+      {
+        ...makeContract('http::POST::/rest/v1/protected/batch', 'consumer', 'frontend'),
+        meta: { serviceRef: 'demo-service' },
+      },
+    ];
+
+    const { matched } = runExactMatch(contracts);
+
+    expect(matched).toHaveLength(1);
+    expect(matched[0].to.repo).toBe('demo-backend');
+  });
 });
 
 // ---------------------------------------------------------------------------

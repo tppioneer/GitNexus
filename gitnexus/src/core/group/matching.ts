@@ -158,6 +158,25 @@ function findMatchingKeys(contractId: string, index: Map<string, StoredContract[
   return [];
 }
 
+function contractMetaString(contract: StoredContract, key: string): string | undefined {
+  const value = contract.meta?.[key];
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function consumerServiceRef(contract: StoredContract): string | undefined {
+  return contractMetaString(contract, 'serviceRef');
+}
+
+function providerServiceName(contract: StoredContract): string | undefined {
+  return contractMetaString(contract, 'serviceName') ?? contractMetaString(contract, 'serviceRef');
+}
+
+function serviceRefMatchesProvider(consumer: StoredContract, provider: StoredContract): boolean {
+  const expectedService = consumerServiceRef(consumer);
+  if (!expectedService) return true;
+  return providerServiceName(provider) === expectedService;
+}
+
 export function buildProviderIndex(
   contracts: StoredContract[],
   matchingConfig?: MatchingConfig,
@@ -197,6 +216,8 @@ export function runExactMatch(
 
     const allMatchingProviders = matchingKeys.flatMap((k) => index.get(k) || []);
     for (const provider of allMatchingProviders) {
+      if (!serviceRefMatchesProvider(consumer, provider)) continue;
+
       if (provider.repo === consumer.repo) {
         if (!provider.service || !consumer.service || provider.service === consumer.service) {
           continue;

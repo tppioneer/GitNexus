@@ -38,6 +38,12 @@ export interface HttpDetection {
   name: string | null;
   /** Confidence in (0, 1]. Source-scan plugins typically use 0.7–0.8. */
   confidence: number;
+  /** Optional logical service name for service-aware HTTP matching (e.g. CSE service name). */
+  serviceRef?: string;
+  /** Optional application namespace retained for diagnostics; it does not participate in matching. */
+  appId?: string;
+  /** Optional raw query template retained for diagnostics/contract display. */
+  queryTemplate?: string;
 }
 
 export interface HttpScanInput {

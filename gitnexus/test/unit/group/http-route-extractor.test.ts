@@ -2720,6 +2720,216 @@ func main() {
     });
   });
 
+  describe('Java CSE RestTemplate support', () => {
+    it('resolves provider paths from external constants and service_description.name', async () => {
+      const dir = path.join(tmpDir, 'java-cse-provider');
+      fs.mkdirSync(path.join(dir, '.gitnexus'), { recursive: true });
+      fs.mkdirSync(path.join(dir, 'code/webapp/src/main/resources'), { recursive: true });
+      fs.mkdirSync(path.join(dir, 'src/controller'), { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, '.gitnexus/microservice-rules.yaml'),
+        `
+externalConstants:
+  - className: com.company.sdk.RoutePrefix
+    constants:
+      REST: /rest
+`,
+      );
+      fs.writeFileSync(
+        path.join(dir, 'code/webapp/src/main/resources/application.yaml'),
+        `
+service_description:
+  name: demo-service
+`,
+      );
+      fs.writeFileSync(
+        path.join(dir, 'src/controller/BatchController.java'),
+        `
+package com.example;
+import org.springframework.web.bind.annotation.*;
+import com.company.sdk.RoutePrefix;
+
+@RestController
+@RequestMapping(BatchController.API_PREFIX)
+public class BatchController {
+    private static final String API_PREFIX = RoutePrefix.REST + "/v1/protected";
+
+    @PostMapping("/batch")
+    public Resp batch() { return null; }
+}
+`,
+      );
+
+      const contracts = await extractor.extract(null, dir, makeRepo(dir));
+      const providers = contracts.filter((c) => c.role === 'provider');
+
+      const route = providers.find(
+        (c) => c.contractId === 'http::POST::/rest/v1/protected/batch',
+      );
+      expect(route).toBeDefined();
+      expect(route!.meta.framework).toBe('spring-cse');
+      expect(route!.meta.serviceName).toBe('demo-service');
+      expect(providers.find((c) => c.contractId === 'http::POST::/batch')).toBeUndefined();
+    });
+
+    it('prefers the resolved CSE provider route over a graph route missing class prefix', async () => {
+      const dir = path.join(tmpDir, 'java-cse-provider-graph-short-path');
+      fs.mkdirSync(path.join(dir, '.gitnexus'), { recursive: true });
+      fs.mkdirSync(path.join(dir, 'code/webapp/src/main/resources'), { recursive: true });
+      fs.mkdirSync(path.join(dir, 'src/controller'), { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, '.gitnexus/microservice-rules.yaml'),
+        `
+externalConstants:
+  - className: com.company.sdk.RoutePrefix
+    constants:
+      REST: /rest
+`,
+      );
+      fs.writeFileSync(
+        path.join(dir, 'code/webapp/src/main/resources/application.yaml'),
+        `
+service_description:
+  name: demo-service
+`,
+      );
+      fs.writeFileSync(
+        path.join(dir, 'src/controller/BatchController.java'),
+        `
+package com.example;
+import org.springframework.web.bind.annotation.*;
+import com.company.sdk.RoutePrefix;
+
+@RestController
+@RequestMapping(BatchController.API_PREFIX)
+public class BatchController {
+    private static final String API_PREFIX = RoutePrefix.REST + "/v1/protected";
+
+    @PostMapping("/batch/delete-batch")
+    public Resp deleteBatch() { return null; }
+}
+`,
+      );
+
+      const mockDbExecutor = async (query: string) => {
+        if (query.includes('HANDLES_ROUTE')) {
+          return [
+            {
+              fileId: 'file-uid-ctrl',
+              filePath: 'src/controller/BatchController.java',
+              routePath: '/batch/delete-batch',
+              routeId: 'route-uid-short',
+              responseKeys: null,
+              routeSource: 'decorator-PostMapping',
+            },
+          ];
+        }
+        return [];
+      };
+
+      const contracts = await extractor.extract(mockDbExecutor, dir, makeRepo(dir));
+      const providers = contracts.filter((c) => c.role === 'provider');
+
+      expect(
+        providers.find(
+          (c) => c.contractId === 'http::POST::/rest/v1/protected/batch/delete-batch',
+        ),
+      ).toBeDefined();
+      expect(
+        providers.find((c) => c.contractId === 'http::POST::/batch/delete-batch'),
+      ).toBeUndefined();
+    });
+
+    it('discovers provider service names from standard Spring Boot application.yml', async () => {
+      const dir = path.join(tmpDir, 'java-cse-provider-spring-boot-yml');
+      fs.mkdirSync(path.join(dir, '.gitnexus'), { recursive: true });
+      fs.mkdirSync(path.join(dir, 'src/main/resources'), { recursive: true });
+      fs.mkdirSync(path.join(dir, 'src/main/java/com/example/controller'), { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, '.gitnexus/microservice-rules.yaml'),
+        `
+externalConstants:
+  - className: com.company.sdk.RoutePrefix
+    constants:
+      REST: /rest
+`,
+      );
+      fs.writeFileSync(
+        path.join(dir, 'src/main/resources/application.yml'),
+        `
+service_description:
+  name: spring-demo-service
+`,
+      );
+      fs.writeFileSync(
+        path.join(dir, 'src/main/java/com/example/controller/BatchController.java'),
+        `
+package com.example.controller;
+import org.springframework.web.bind.annotation.*;
+import com.company.sdk.RoutePrefix;
+
+@RestController
+@RequestMapping(RoutePrefix.REST + "/v1/protected")
+public class BatchController {
+    @PostMapping("/batch")
+    public Resp batch() { return null; }
+}
+`,
+      );
+
+      const contracts = await extractor.extract(null, dir, makeRepo(dir));
+      const route = contracts.find(
+        (c) => c.contractId === 'http::POST::/rest/v1/protected/batch',
+      );
+
+      expect(route).toBeDefined();
+      expect(route!.meta.serviceName).toBe('spring-demo-service');
+    });
+
+    it('resolves RestTemplateBuilder CSE URLs through constants and URI helpers', async () => {
+      const dir = path.join(tmpDir, 'java-cse-consumer');
+      fs.mkdirSync(path.join(dir, 'src/client'), { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, 'src/client/BatchClient.java'),
+        `
+package com.example;
+import java.net.URI;
+import org.springframework.http.HttpMethod;
+import org.springframework.web.client.RestTemplate;
+
+public class BatchClient {
+    private static final String ROOT = "cse://app-id:demo-service/rest/v1";
+    private static final String DELETE_URL = ROOT + "/protected/batch?batch_id=%s";
+    private final RestTemplate client = RestTemplateBuilder.create();
+
+    private URI buildRealUri(String url) { return URI.create(url); }
+
+    public Resp call() {
+        return this.client
+            .exchange(buildRealUri(DELETE_URL), HttpMethod.POST, null, Resp.class)
+            .getBody();
+    }
+}
+`,
+      );
+
+      const contracts = await extractor.extract(null, dir, makeRepo(dir));
+      const consumers = contracts.filter((c) => c.role === 'consumer');
+
+      const route = consumers.find(
+        (c) => c.contractId === 'http::POST::/rest/v1/protected/batch',
+      );
+      expect(route).toBeDefined();
+      expect(route!.meta.framework).toBe('spring-rest-template-cse');
+      expect(route!.meta.serviceRef).toBe('demo-service');
+      expect(route!.meta.appId).toBe('app-id');
+      expect(route!.meta.queryTemplate).toBe('batch_id=%s');
+      expect(
+        consumers.find((c) => String(c.contractId).includes('cse:/app-id')),
+      ).toBeUndefined();
+    });
+  });
+
   describe('provider extraction — Laravel', () => {
     it('extracts Laravel Route::get patterns', async () => {
       const dir = path.join(tmpDir, 'laravel');

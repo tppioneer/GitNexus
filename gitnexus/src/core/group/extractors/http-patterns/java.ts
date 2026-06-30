@@ -17,6 +17,13 @@ import type {
   HttpLanguagePlugin,
   HttpScanInput,
 } from './types.js';
+import { loadJavaCseRules } from './java-cse-rules.js';
+import { buildJavaCseRepoContext } from './java-constant-resolver.js';
+import type { JavaCseRepoContext } from './java-constant-resolver.js';
+import {
+  scanRestTemplateCseConsumers,
+  scanSpringCseProviders,
+} from './java-resttemplate-cse.js';
 
 /**
  * Java HTTP plugin. Handles:
@@ -675,8 +682,16 @@ function scanSpringProject(files: readonly HttpScanInput[]): HttpFileDetections[
 export const JAVA_HTTP_PLUGIN: HttpLanguagePlugin = {
   name: 'java-http',
   language: Java,
-  scan(tree) {
+  prepareRepo({ repoPath, files, readFile }) {
+    const rules = loadJavaCseRules(repoPath);
+    return buildJavaCseRepoContext({ files, readFile, rules });
+  },
+  scan(tree, repoContext, fileRel) {
     const out: HttpDetection[] = [];
+    const cseContext = repoContext as JavaCseRepoContext | undefined;
+
+    out.push(...scanSpringCseProviders(tree, fileRel, cseContext));
+    out.push(...scanRestTemplateCseConsumers(tree, fileRel, cseContext));
 
     // ─── Spring providers + OpenFeign consumers (one query pass) ────
     // `scanRouteAnnotations` resolves every route-defining annotation —
@@ -706,6 +721,12 @@ export const JAVA_HTTP_PLUGIN: HttpLanguagePlugin = {
       }
       const enclosingClass = findEnclosingClass(route.methodNode);
       if (!enclosingClass) continue;
+      if (
+        hasAnnotation(enclosingClass, 'RequestMapping') &&
+        !prefixByTypeId.has(enclosingClass.id)
+      ) {
+        continue;
+      }
       const prefix = prefixByTypeId.get(enclosingClass.id) ?? '';
       out.push({
         role: 'provider',

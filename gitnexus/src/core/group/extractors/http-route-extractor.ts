@@ -73,7 +73,12 @@ ORDER BY sym.startLine`;
  *   - collapse `:id`, `{id}`, `[id]` path params into a single `{param}`
  */
 export function normalizeHttpPath(p: string): string {
-  let s = p.trim().split('?')[0].toLowerCase().replace(/\/+$/, '');
+  let s = p.trim().split('?')[0].toLowerCase().replace(/\\/g, '/');
+  s = s.replace(/\/+/g, '/');
+  if (s === '') s = '/';
+  if (!s.startsWith('/')) s = `/${s}`;
+  s = s.replace(/\/+$/, '');
+  s = s.replace(/(^|\/)%s(?=\/|$)/g, '$1{param}');
   s = s.replace(/:\w+/g, '{param}');
   s = s.replace(/\{[^}]+\}/g, '{param}');
   s = s.replace(/\[[^\]]+\]/g, '{param}');
@@ -98,6 +103,8 @@ function normalizeConsumerPath(url: string): string {
     } catch {
       pathOnly = templated.replace(/^https?:\/\/[^/]+/i, '');
     }
+  } else if (/^cse:\/\//i.test(templated)) {
+    pathOnly = templated.replace(/^cse:\/\/[^/]+/i, '') || '/';
   }
   const normalized = normalizeHttpPath(pathOnly || '/');
   const segments = normalized
@@ -393,6 +400,7 @@ export class HttpRouteExtractor implements ContractExtractor {
         handlerName = match.name;
       }
       if (!method) method = 'GET';
+      const serviceName = match?.serviceRef;
 
       const pathNorm = normalizeHttpPath(routePath);
       const cid = contractIdFor(method, pathNorm);
@@ -429,6 +437,7 @@ export class HttpRouteExtractor implements ContractExtractor {
           pathSegments: pathNorm.split('/').filter(Boolean),
           extractionStrategy: 'graph_assisted',
           routeSource,
+          ...(serviceName ? { serviceName } : {}),
         },
       });
     }
@@ -461,6 +470,7 @@ export class HttpRouteExtractor implements ContractExtractor {
             pathSegments: pathNorm.split('/').filter(Boolean),
             extractionStrategy: 'source_scan',
             framework: d.framework,
+            ...(d.serviceRef ? { serviceName: d.serviceRef } : {}),
           },
         });
       }
@@ -504,8 +514,10 @@ export class HttpRouteExtractor implements ContractExtractor {
       const consumerCandidates = detections.filter(
         (d) => d.role === 'consumer' && normalizeConsumerPath(d.path) === pathNorm,
       );
+      let consumerDetection: (typeof consumerCandidates)[number] | undefined;
       if (consumerCandidates.length === 1) {
-        method = consumerCandidates[0].method;
+        consumerDetection = consumerCandidates[0];
+        method = consumerDetection.method;
       }
 
       const cid = contractIdFor(method, pathNorm);
@@ -539,6 +551,11 @@ export class HttpRouteExtractor implements ContractExtractor {
           path: pathNorm,
           extractionStrategy: 'graph_assisted',
           fetchReason: String(row.fetchReason ?? ''),
+          ...(consumerDetection?.serviceRef ? { serviceRef: consumerDetection.serviceRef } : {}),
+          ...(consumerDetection?.appId ? { appId: consumerDetection.appId } : {}),
+          ...(consumerDetection?.queryTemplate
+            ? { queryTemplate: consumerDetection.queryTemplate }
+            : {}),
         },
       });
     }
@@ -570,6 +587,9 @@ export class HttpRouteExtractor implements ContractExtractor {
             path: pathNorm,
             extractionStrategy: 'source_scan',
             framework: d.framework,
+            ...(d.serviceRef ? { serviceRef: d.serviceRef } : {}),
+            ...(d.appId ? { appId: d.appId } : {}),
+            ...(d.queryTemplate ? { queryTemplate: d.queryTemplate } : {}),
           },
         });
       }
@@ -593,13 +613,37 @@ export class HttpRouteExtractor implements ContractExtractor {
     graphContracts: ExtractedContract[],
     sourceContracts: ExtractedContract[],
   ): ExtractedContract[] {
-    const seenContractIds = new Set(graphContracts.map((c) => c.contractId));
-    const out = [...graphContracts];
+    const filteredGraphContracts = graphContracts.filter(
+      (graph) =>
+        !sourceContracts.some((source) => this.isSourceProviderSuperset(graph, source)),
+    );
+    const seenContractIds = new Set(filteredGraphContracts.map((c) => c.contractId));
+    const out = [...filteredGraphContracts];
     for (const contract of sourceContracts) {
       if (seenContractIds.has(contract.contractId)) continue;
       seenContractIds.add(contract.contractId);
       out.push(contract);
     }
     return out;
+  }
+
+  private isSourceProviderSuperset(
+    graph: ExtractedContract,
+    source: ExtractedContract,
+  ): boolean {
+    if (graph.type !== 'http' || source.type !== 'http') return false;
+    if (graph.role !== 'provider' || source.role !== 'provider') return false;
+    if (graph.meta.extractionStrategy !== 'graph_assisted') return false;
+    if (source.meta.extractionStrategy !== 'source_scan') return false;
+    if (graph.meta.method !== source.meta.method) return false;
+
+    const graphFile = graph.symbolRef.filePath.replace(/\\/g, '/');
+    const sourceFile = source.symbolRef.filePath.replace(/\\/g, '/');
+    if (graphFile !== sourceFile) return false;
+
+    const graphPath = typeof graph.meta.path === 'string' ? graph.meta.path : '';
+    const sourcePath = typeof source.meta.path === 'string' ? source.meta.path : '';
+    if (!graphPath || !sourcePath || graphPath === sourcePath) return false;
+    return sourcePath.endsWith(graphPath);
   }
 }
