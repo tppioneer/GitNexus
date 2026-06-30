@@ -98,6 +98,49 @@ describe('syncGroup', () => {
     expect(result.missingRepos).toHaveLength(0);
   });
 
+  it('delegates exact matching to an explicitly supplied extension', async () => {
+    const contracts = [
+      makeContract('http::GET::/api/users', 'consumer', 'app/frontend'),
+    ];
+    const extensionMatcher = vi.fn(() => ({
+      matched: [],
+      unmatched: contracts,
+    }));
+
+    const result = await syncGroup(makeConfig({}), {
+      extractorOverride: async () => contracts,
+      extension: { runExactMatch: extensionMatcher },
+      skipWrite: true,
+    });
+
+    expect(extensionMatcher).toHaveBeenCalledOnce();
+    expect(result.unmatched).toEqual(contracts);
+  });
+
+  it('rethrows repo failures when the extension requests atomic failure', async () => {
+    const poolAdapter = await import('../../../src/core/lbug/pool-adapter.js');
+    const initSpy = vi
+      .spyOn(poolAdapter, 'initLbug')
+      .mockRejectedValue(new Error('plugin extraction setup failed'));
+
+    try {
+      await expect(
+        syncGroup(makeConfig({ 'app/backend': 'backend-repo' }), {
+          resolveRepoHandle: async (_name, groupPath) => ({
+            id: 'backend-repo',
+            path: groupPath,
+            repoPath: '/tmp/app/backend',
+            storagePath: '/tmp/app/backend/.gitnexus',
+          }),
+          extension: { abortOnRepoError: true },
+          skipWrite: true,
+        }),
+      ).rejects.toThrow('plugin extraction setup failed');
+    } finally {
+      initSpy.mockRestore();
+    }
+  });
+
   it('intra-repo matching works with service field via extractorOverride', async () => {
     const config = makeConfig({ 'platform/monorepo': 'monorepo' });
 

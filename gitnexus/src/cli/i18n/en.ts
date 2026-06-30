@@ -274,6 +274,8 @@ export const en = {
   'help.option.group.sync.exactOnly': 'Exact match only',
   'help.option.group.sync.allowStale': 'Skip stale index warnings',
   'help.option.group.sync.verbose': 'Show each cross-link detail',
+  'help.option.group.sync.plugin':
+    'Enable one built-in group-sync plugin for this invocation',
   'help.option.json': 'JSON output',
   'help.option.group.impact.target': 'Symbol or file name to analyze',
   'help.option.group.impact.repo':

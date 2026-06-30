@@ -154,26 +154,55 @@ export function registerGroupCommands(program: Command): void {
     .option('--allow-stale', 'Skip stale index warnings')
     .option('--verbose', 'Show each cross-link detail')
     .option('--json', 'JSON output')
-    .action(async (name: string, opts: Record<string, boolean | undefined>) => {
+    .option('--plugin <id>', 'Enable one built-in group-sync plugin for this invocation')
+    .action(async (name: string, opts: Record<string, boolean | string | undefined>) => {
       const { getGroupDir, getDefaultGitnexusDir } = await import('../core/group/storage.js');
       const { loadGroupConfig } = await import('../core/group/config-parser.js');
       const { syncGroup } = await import('../core/group/sync.js');
 
       const groupDir = getGroupDir(getDefaultGitnexusDir(), name);
       const config = await loadGroupConfig(groupDir);
+      const pluginId = typeof opts.plugin === 'string' ? opts.plugin.trim() : '';
+      let pluginRuntime;
+      if (pluginId) {
+        const { loadBuiltinGroupPlugin } = await import('../plugins/plugin-registry.js');
+        const plugin = await loadBuiltinGroupPlugin(pluginId);
+        pluginRuntime = plugin.createRuntime();
+      }
 
       console.log(`Syncing group "${name}" (${Object.keys(config.repos).length} repos)...\n`);
 
-      const result = await syncGroup(config, {
-        groupDir,
-        allowStale: Boolean(opts.allowStale),
-        verbose: Boolean(opts.verbose),
-        skipEmbeddings: Boolean(opts.skipEmbeddings),
-        exactOnly: Boolean(opts.exactOnly),
-      });
+      let result;
+      try {
+        result = await syncGroup(config, {
+          groupDir,
+          allowStale: Boolean(opts.allowStale),
+          verbose: Boolean(opts.verbose),
+          skipEmbeddings: Boolean(opts.skipEmbeddings),
+          exactOnly: Boolean(opts.exactOnly),
+          extension: pluginRuntime?.extension,
+        });
+      } catch (err) {
+        if (!pluginRuntime) throw err;
+        const message = err instanceof Error ? err.message : String(err);
+        if (opts.json) {
+          console.log(JSON.stringify({ error: message, plugin: pluginRuntime.getReport() }, null, 2));
+        } else {
+          console.error(`CSE-link sync failed: ${message}`);
+          console.error('Previous contracts registry was preserved.');
+        }
+        process.exitCode = 1;
+        return;
+      }
 
       if (opts.json) {
-        console.log(JSON.stringify(result, null, 2));
+        console.log(
+          JSON.stringify(
+            pluginRuntime ? { ...result, plugin: pluginRuntime.getReport() } : result,
+            null,
+            2,
+          ),
+        );
       } else {
         console.log(`\nMatching cascade:`);
         const exactLinks = result.crossLinks.filter((l) => l.matchType === 'exact');
@@ -182,6 +211,15 @@ export function registerGroupCommands(program: Command): void {
         console.log(
           `\nWrote contracts.json (${result.contracts.length} contracts, ${result.crossLinks.length} cross-links)`,
         );
+        if (pluginRuntime) {
+          const report = pluginRuntime.getReport();
+          console.log(`  plugin:    ${report.id}@${report.version}`);
+          for (const diagnostic of report.diagnostics) {
+            console.log(
+              `  ${diagnostic.severity}: ${diagnostic.code} ${diagnostic.repo}: ${diagnostic.message}`,
+            );
+          }
+        }
       }
     });
 
