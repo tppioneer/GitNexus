@@ -1,0 +1,27 @@
+format_version: 1
+benchmark_version: v2
+status: git-managed
+created_at: 2026-07-11T11:15:39+08:00
+parent_version: v1
+source:
+  kind: benchmark-working-tree-snapshot
+  base_commit: fe4640ddd964cd1a032abba075cbd039f923fd9e
+  scope:
+    - docs/benchmark
+    - eval/benchmark
+compatibility:
+  score_comparable_with: [v2]
+  cross_version_aggregation: forbidden
+paths:
+  runner: runner/agent_benchmark_runner.py
+  external_runner: runner/run_external_benchmark.ps1
+  scoring_rubric: shared/scoring-rubric.md
+  result_schema: shared/schemas/run-result.schema.json
+  runs: runs/v2
+result_policy:
+  primary_comparison: paired-case-repeat
+  overwrite_existing_experiment: forbidden
+new_case_families:
+  qwenpaw: [d, e, f]
+  telecom: [d, e, f]
+  telecom-large: [j, m, s]

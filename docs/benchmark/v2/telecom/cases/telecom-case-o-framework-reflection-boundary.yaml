@@ -1,0 +1,48 @@
+id: telecom-case-o-framework-reflection-boundary
+name: Telecom Spring event, AOP and reflection coverage boundary
+level: L2
+task_type: coverage_boundary
+repo: telecom-ops-platform
+status: draft-ground-truth
+
+prompt: |
+  请分析 network-change-service 中以下框架边界的调用关系：
+  1. Spring Event：
+     - ChangePlanService.approve → publishEvent(ChangeApprovedEvent) → ChangeApprovedListener.onApproved (@EventListener)
+     - ChangeExecutionService.execute/complete → publishEvent(ChangeCompletedEvent) → ChangeCompletedListener.afterCommit (@TransactionalEventListener AFTER_COMMIT)
+     - ChangeNotificationListener.notifyAsync (@Async @EventListener)
+     标明这些是 FRAMEWORK_EVENT_DISPATCH 边，不是普通 Java CALLS。
+  2. AOP：
+     - AuditOperationAspect @Around("@annotation(auditOperation)") 拦截带 @AuditOperation 的方法
+     - ProceedingJoinPoint.proceed 不是对业务方法的普通静态 call
+     标明 FRAMEWORK_AOP 边。
+  3. 反射和 ServiceLoader：
+     - ChangePluginLoader.loadAndExecuteReflective 使用 Class.forName、Method.invoke
+     - ChangePluginLoader.loadViaServiceLoader 使用 ServiceLoader.load
+     - META-INF/services/com.example.telecom.change.plugin.ChangeValidationPlugin 注册 BenchmarkChangeValidationPlugin
+     - PluginDescriptor 中的 className 和 executeMethodName 是配置字符串
+     标明 REFLECTION_BOUNDARY 和 SERVICE_LOADER 边。
+  本 case 不以"找出越多边越好"为目标，而以边类型正确、不过度宣称为目标。
+
+graph_queries:
+  - 'context({name: "ChangePluginLoader"})'
+  - 'context({name: "AuditOperationAspect"})'
+  - 'context({name: "ChangeCompletedListener"})'
+
+grep_searches:
+  - rg "publishEvent|@EventListener|@TransactionalEventListener|@Async"
+  - rg "Class\.forName|Method\.invoke|ServiceLoader\.load"
+  - rg "@Aspect|@Around|ProceedingJoinPoint"
+
+ground_truth: docs/benchmark/v2/telecom/ground-truth/telecom-case-o-ground-truth.yaml
+
+risk_level: HIGH
+
+scoring:
+  must_identify:
+    - event dispatch 边及类型
+    - AOP advice 边及类型
+    - 反射和 ServiceLoader 边界
+  must_exclude:
+    - 将框架边标为普通 CALLS
+    - 将 PluginDescriptor 字符串标为调用边

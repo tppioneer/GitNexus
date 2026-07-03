@@ -1,0 +1,16 @@
+id: qwenpaw-case-y-token-usage-flush-retry-bug
+name: QwenPaw token usage flush retry failure
+level: L2
+task_type: bug_localization
+repo: QwenPaw
+status: reviewed
+
+prompt: |
+  回归现象：模型调用的 token 统计在内存查询中可见，但一次临时的磁盘写入失败后，文件长时间保持旧内容；即使后续磁盘恢复正常，周期任务也不再尝试写入，进程异常退出后这段统计丢失。
+  请定位“首次失败后不再重试”的完整路径，解释内存状态和持久化状态为何分叉，并给出能稳定复现该问题的最小测试。
+  不要修改代码，只输出根因、证据、影响和验证建议。
+
+extra_desc: |
+  Case 设计与人工审阅提示，不进入模型公开载荷：重点核对 TokenUsageBuffer._flush_once 对 _dirty 的更新时机，以及 save_data_sync 吞掉 OSError 后无法把失败反馈给调用者；不要把队列满导致的主动丢弃混为同一根因。
+
+ground_truth: docs/benchmark/v2/qwenpaw/ground-truth/qwenpaw-case-y-token-usage-flush-retry-bug-ground-truth.yaml

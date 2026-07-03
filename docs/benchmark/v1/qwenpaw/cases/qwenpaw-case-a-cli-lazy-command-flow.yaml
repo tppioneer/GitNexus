@@ -1,0 +1,51 @@
+id: qwenpaw-case-a-cli-lazy-command-flow
+name: QwenPaw CLI lazy command dispatch flow
+level: L2
+task_type: flow_tracing
+repo: QwenPaw
+status: draft-ground-truth
+
+prompt: |
+  请分析 QwenPaw CLI 从命令行入口启动后，如何解析并懒加载子命令。
+  重点说明：
+  1. Python 包入口如何进入 Click CLI；
+  2. LazyGroup 如何列出和解析子命令；
+  3. 子命令模块何时被动态 import；
+  4. host/port 默认值如何从最近 API 配置回退到默认值；
+  5. 如果要新增一个 CLI 子命令，应该检查哪些文件和注册点。
+  不要修改代码，只输出完整调用链、关键符号、文件和风险。
+
+tool_policies:
+  grep:
+    allowed:
+      - rg
+      - read_file
+    forbidden:
+      - gitnexus.query
+      - gitnexus.context
+      - gitnexus.impact
+      - gitnexus.detect_changes
+  graph:
+    allowed:
+      - gitnexus.query
+      - gitnexus.context
+      - gitnexus.impact
+      - read_file
+    forbidden:
+      - broad_rg_scan
+  mixed:
+    allowed:
+      - rg
+      - read_file
+      - gitnexus.query
+      - gitnexus.context
+      - gitnexus.impact
+
+suggested_queries:
+  grep:
+    - 'rg "LazyGroup|lazy_subcommands|def cli|read_last_api|project.scripts" pyproject.toml src/qwenpaw'
+    - 'rg "__main__|qwenpaw =|copaw =" pyproject.toml src/qwenpaw'
+  graph:
+    - 'query({search_query: "QwenPaw CLI LazyGroup lazy_subcommands"})'
+    - 'context({name: "LazyGroup"})'
+    - 'context({name: "cli"})'

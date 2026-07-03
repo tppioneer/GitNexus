@@ -1,0 +1,58 @@
+case_id: telecom-large-case-f-alarm-lifecycle-hook-impact
+task_type: impact_analysis
+
+target:
+  symbol: AlarmLifecycleHook.process
+  file: alarm-engine-service/src/main/java/com/example/telecom/alarm/policy/AlarmLifecycleHook.java
+  current_signature: "void process(AlarmRecord alarm)"
+  proposed_signature: "void process(AlarmRecord alarm, AlarmLifecycleContext context)"
+  graph_risk: LOW
+  graph_blast_radius:
+    direct_callers: 4
+    total_impacted_with_depth_2: 12
+    affected_process_groups: 0
+
+expected_symbols:
+  - symbol: AlarmCreationHook.process
+    file: alarm-engine-service/.../policy/AlarmCreationHook.java
+    reason: "Hook implementation - enrich metadata, set OPEN, update timestamps, log high-severity notification."
+  - symbol: AlarmClearedHook.process
+    file: alarm-engine-service/.../policy/AlarmClearedHook.java
+    reason: "Hook implementation - set CLEARED, save AlarmRecord, inspect related active alarms."
+  - symbol: AlarmEscalationHook.process
+    file: alarm-engine-service/.../policy/AlarmEscalationHook.java
+    reason: "Hook implementation - check elapsed threshold, append escalation description, save AlarmRecord."
+  - symbol: AlarmHookRegistry.executeHooks
+    file: alarm-engine-service/.../policy/AlarmHookRegistry.java
+    reason: "Iterates CopyOnWriteArrayList in registration order and catches each hook exception independently."
+
+reachability_finding:
+  production_callers_of_executeHooks: 0
+  test_callers_only:
+    - AlarmHookRegistryTest.shouldRegisterAndExecuteHooks
+    - AlarmHookRegistryTest.shouldExecuteMultipleHooksInOrder
+  conclusion: >
+    The signature change affects implementations, registry dispatch, and tests, but the current graph
+    contains no production path from AlarmEvaluationService or another service into executeHooks.
+    Do not report the hook mechanism as part of the live alarm execution flow without additional wiring.
+
+must_mention:
+  - Three real AlarmLifecycleHook implementations must be identified.
+  - AlarmHookRegistry.executeHooks is the only interface-typed caller.
+  - Registry executes hooks in registration order; a single hook exception does not interrupt subsequent hooks.
+  - Currently executeHooks has zero production callers — only tests invoke it.
+  - Must explicitly conclude "no production reachability" — do not claim hooks are in the live alarm flow.
+
+must_exclude_from_impact:
+  - symbol: NotificationRetryService.process
+    reason: Notification retry loop, not AlarmLifecycleHook.
+  - symbol: WorkOrderBulkActionService.process
+    reason: Work-order batch processing, unrelated interface.
+  - symbol: AlarmExportService.process
+    reason: Alarm export processing that does not implement AlarmLifecycleHook.
+  - symbol: AlarmEvaluationService.evaluate
+    reason: No current production call edge to AlarmHookRegistry.executeHooks.
+
+recommended_validation:
+  - mvn -pl alarm-engine-service test
+  - add an explicit production integration test only if hook wiring is introduced later

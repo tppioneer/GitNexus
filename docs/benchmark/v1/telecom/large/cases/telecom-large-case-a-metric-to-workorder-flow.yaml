@@ -1,0 +1,56 @@
+case: telecom-large-case-a-metric-to-workorder-flow
+level: L1 - flow_tracing
+title: "【50K 规模】设备指标到自动工单执行流追踪"
+
+description: >
+  50,000 行规模的电信运维平台。追踪设备指标从 POST /api/devices/{deviceId}/metrics
+  进入系统，经厂商适配、标准化、事件发布、告警引擎评估、到自动工单创建和派单的完整调用链。
+  注意：新增了 6 个模块（device-lifecycle, alarm-federated, vendor-collaboration,
+  dispatch, sla-engine, common-test），新增执行流不应与核心链路混淆。
+
+task: >
+  请分析设备指标从 POST /api/devices/{deviceId}/metrics 进入系统，
+  到生成告警、达到阈值后自动创建工单的完整调用链，
+  并标注每一步副作用。不要修改代码。
+
+entry_point:
+  controller: DeviceMetricIngestController
+  method: ingestMetric
+  route: POST /api/devices/{deviceId}/metrics
+
+graph_queries:
+  - 'query({search_query: "device metric to alarm to work order flow"})'
+  - 'context({name: "DeviceMetricIngestController"})'
+  - 'context({name: "AlarmEvaluationService"})'
+  - 'context({name: "AutoWorkOrderService"})'
+
+grep_searches:
+  - rg "POST /api/devices|/api/devices/.*/metrics|ingestMetric"
+  - rg "DeviceMetricEvent|AlarmEvent|WorkOrderEvent"
+  - rg "evaluate|createForAlarm|publish"
+
+ground_truth: docs/benchmark/v1/telecom/large/ground-truth/telecom-large-case-a-ground-truth.yaml
+
+scoring:
+  must_identify_side_effects:
+    - 指标写入内存 repository
+    - 指标事件发布
+    - 阈值规则读取
+    - 告警写入 repository
+    - 告警事件发布
+    - 工单写入 repository
+    - 工单状态流转
+    - 工单事件发布
+
+  penalty_items:
+    # 原有扣分点
+    - 把 ops-gateway-service 看板查询误认为指标入口
+    - 漏掉 DeviceMetricEventConsumer 或 AlarmEventConsumer
+    - 把通知发送作为自动工单创建的必经步骤
+    - 忽略 DomainEventBus 导致事件链断裂
+    # 50K 规模新增扣分点
+    - 把联邦告警汇聚流 (FederatedAlarmIngestController) 误认为指标入口
+    - 把设备生命周期流 (DeviceLifecycleController) 纳入核心链路
+    - 把厂商协同流 (VendorTicketService) 纳入核心链路
+    - 把调度引擎 (DispatchEngine) 纳入核心链路
+    - 把 SLA 违约检测 (SlaBreachDetectionService) 纳入核心链路

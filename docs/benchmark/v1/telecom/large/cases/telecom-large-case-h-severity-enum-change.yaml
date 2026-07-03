@@ -1,0 +1,50 @@
+case: telecom-large-case-h-severity-enum-change
+level: L3 - small_code_change
+title: "【50K 规模】AlarmRecord.severity 类型收紧"
+
+description: >
+  50,000 行规模。将 AlarmRecord.severity 的写入路径收紧为只能通过
+  AlarmSeverityClassifier 和指定枚举值生成。新增的 alarm-federated-service
+  也有告警 severity 相关逻辑，不应被误改。
+
+task: >
+  请将 AlarmRecord.severity 的写入路径收紧为只能通过 AlarmSeverityClassifier 和指定枚举值生成，
+  同步检查告警评估、导出、Dashboard、工单优先级映射和测试。
+
+target_field: AlarmRecord.severity
+
+affected_services:
+  - AlarmEvaluationService
+  - AlarmExportService
+  - AlarmSeverityClassifier
+  - AutoWorkOrderService (priority mapping)
+  - DashboardAggregationService
+
+interference_services:
+  - "FederatedAlarmAggregationService (alarm-federated, different alarm type)"
+  - "FederatedAlarmCorrelationService (alarm-federated, not AlarmRecord)"
+  - "AlarmEscalationEvaluator (alarm-engine, reads severity but doesn't write)"
+
+graph_queries:
+  - 'impact({target: "severity", direction: "upstream"})'
+  - 'context({name: "AlarmRecord"})'
+  - 'context({name: "AlarmSeverityClassifier"})'
+
+grep_searches:
+  - rg "AlarmRecord.severity|setSeverity|getSeverity"
+  - rg "Severity\\.(INFO|WARNING|MAJOR|CRITICAL)"
+  - rg "AlarmSeverityClassifier|classify"
+
+ground_truth: docs/benchmark/v1/telecom/large/ground-truth/telecom-large-case-h-ground-truth.yaml
+
+risk_level: MEDIUM
+
+scoring:
+  must_identify:
+    - AlarmRecord.severity 字段
+    - AlarmSeverityClassifier 为唯一授权写入路径
+    - 所有直接 setSeverity 的调用点
+    - AutoWorkOrderService 中的 severity->priority 映射
+  penalty_items:
+    - 修改 FederatedAlarmRecord 的 severity 相关逻辑
+    - 遗漏 DashboardAggregationService 中的 severity 聚合

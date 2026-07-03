@@ -1,0 +1,51 @@
+case: telecom-large-case-i-maintenance-window-suppression
+level: L2 - impact_analysis
+title: "【50K 规模】维护窗口告警抑制逻辑影响分析"
+
+description: >
+  50,000 行规模。维护窗口告警抑制逻辑变更影响分析。
+  新增的 sla-engine-service 和 device-lifecycle-service 也包含
+  evaluate 和 suppression 相关方法，不应与告警抑制混淆。
+
+task: >
+  请分析如果调整维护窗口内告警抑制逻辑，会影响哪些告警评估、升级、导出、Dashboard 和测试？
+
+target:
+  service: AlarmSuppressionService
+  related:
+    - MaintenanceWindowService
+    - SuppressionRuleEvaluator
+    - AlarmEscalationService
+    - AlarmExportService
+    - DashboardAggregationService
+
+interference:
+  - "DeviceDeprecationPolicy.evaluate (device-lifecycle, unrelated to alarm)"
+  - "SlaBreachPolicy.evaluate (sla-engine, unrelated to alarm suppression)"
+  - "DeviceLifecycleService (device-lifecycle, unrelated)"
+
+graph_queries:
+  - 'impact({target: "shouldSuppress", direction: "upstream"})'
+  - 'context({name: "AlarmSuppressionService"})'
+  - 'context({name: "MaintenanceWindowService"})'
+
+grep_searches:
+  - rg "AlarmSuppressionService|shouldSuppress"
+  - rg "MaintenanceWindowService|MaintenanceWindow"
+  - rg "SuppressionRuleEvaluator|suppress"
+
+ground_truth: docs/benchmark/v1/telecom/large/ground-truth/telecom-large-case-i-ground-truth.yaml
+
+risk_level: MEDIUM
+
+scoring:
+  must_identify:
+    - AlarmSuppressionService.shouldSuppress
+    - MaintenanceWindowService 和 MaintenanceWindowRepository
+    - AlarmEscalationService（抑制后的升级逻辑）
+    - AlarmExportService（抑制后的导出逻辑）
+    - DashboardAggregationService（抑制后的统计影响）
+  penalty_items:
+    - 把 DeviceDeprecationPolicy 纳入影响面
+    - 把 SlaBreachPolicy 纳入影响面
+    - 把 RuleEvaluator.evaluate 纳入影响面（Case B 目标，不是本 case）

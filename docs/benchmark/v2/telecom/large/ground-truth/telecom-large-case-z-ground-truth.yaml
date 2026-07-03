@@ -1,0 +1,40 @@
+case_id: telecom-large-case-z-batch-dispatch-failure-bug
+task_type: bug_localization
+ground_truth_status: reviewed
+
+expected_root_causes:
+  - symbol: DispatchOrchestrationService.batchDispatch
+    file: dispatch-service/src/main/java/com/example/telecom/dispatch/service/DispatchOrchestrationService.java
+    reason: Preserves one DispatchResponse per input, including FAILED responses from dispatch and synthetic FAILED responses for exceptions.
+  - symbol: DispatchOrchestrationService.dispatch
+    file: dispatch-service/src/main/java/com/example/telecom/dispatch/service/DispatchOrchestrationService.java
+    reason: No-operator path returns a FAILED response without throwing.
+  - symbol: DispatchController.batchAssign
+    file: dispatch-service/src/main/java/com/example/telecom/dispatch/controller/DispatchController.java
+    reason: Discards the returned list and always returns ApiResponse<Void>.success(null) unless a batch-level DomainException escapes.
+  - symbol: DispatchResponse.status
+    file: dispatch-service/src/main/java/com/example/telecom/dispatch/dto/DispatchResponse.java
+    reason: Carries the per-item FAILED/ASSIGNED result that the controller omits.
+
+expected_data_flow:
+  - field: workOrderId
+    route: "List<DispatchRequest> -> IDs -> batchDispatch -> per-item DispatchResponse"
+  - field: status
+    route: "dispatch/no-operator/exception -> DispatchResponse.status -> discarded by controller -> success(null)"
+
+must_mention:
+  - batchDispatch catches ordinary Exception per item and continues, so most partial failures never reach the controller catch block.
+  - A FAILED DispatchResponse is counted in responses.size and logged as if dispatch succeeded.
+  - The controller response type prevents clients from observing per-item status or correlating failures to workOrderId.
+  - Empty input returns success with no details under the same design.
+
+must_exclude_from_impact:
+  - symbol: DispatchEngine.batchAssign
+    reason: Different batch helper and not called by DispatchController.batchAssign.
+  - symbol: DispatchOptimizer.optimize
+    reason: Scheduling optimization is not part of this API path.
+
+recommended_validation:
+  - Add controller tests for mixed ASSIGNED/FAILED responses and assert the current loss of item details.
+  - Add service tests for all success, no-operator failure and thrown exception, verifying one result per input and preserved workOrderId/status.
+

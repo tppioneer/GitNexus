@@ -1,0 +1,11 @@
+id: REPLACE_PROJECT_SLUG-case-a-REPLACE_CASE_SLUG
+name: REPLACE_CASE_NAME
+level: L2
+status: draft-ground-truth
+title: REPLACE_USER_VISIBLE_TITLE
+description: >
+  REPLACE_WITH_THE_CODE_INVESTIGATION_CONTEXT_AND_WHY_TEXT_SEARCH_HAS_NOISE.
+task: >
+  REPLACE_WITH_THE_EXACT_AGENT_TASK. Do not modify code unless this is a
+  modification case. Require concrete files, symbols, call chains, exclusions,
+  risks, and recommended validation.

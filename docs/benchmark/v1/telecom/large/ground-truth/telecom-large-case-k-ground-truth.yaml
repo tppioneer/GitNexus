@@ -1,0 +1,83 @@
+case: telecom-large-case-k
+ground_truth_type: flow_tracing
+truth_version: "1.0"
+project_scale: "50K"
+expected_files:
+  - file: alarm-federated-service/.../controller/FederatedAlarmIngestController.java
+  - file: alarm-federated-service/.../service/AlarmIngestionService.java
+  - file: alarm-federated-service/.../repository/FederatedAlarmSourceRegistry.java
+  - file: alarm-federated-service/.../service/FederatedAlarmAggregationService.java
+  - file: alarm-federated-service/.../aggregation/*AggregationStrategy.java
+  - file: alarm-federated-service/.../service/FederatedAlarmDeduplicationService.java
+  - file: alarm-federated-service/.../service/FederatedAlarmCorrelationService.java
+  - file: alarm-federated-service/.../correlation/CorrelationRuleMatcher.java
+  - file: alarm-federated-service/.../correlation/FederatedCorrelationEngine.java
+  - file: alarm-federated-service/.../repository/FederatedAlarmRepository.java
+  - file: alarm-federated-service/.../event/AlarmFederationEventPublisher.java
+expected_symbols:
+  - symbol: FederatedAlarmIngestController.ingestAlarm
+  - symbol: POST /api/federated/alarms
+  - symbol: AlarmIngestionService.ingest
+  - symbol: FederatedAlarmSourceRegistry.resolve
+  - symbol: FederatedAlarmAggregationService.aggregate
+  - symbol: AggregationStrategy.aggregate
+  - symbol: FederatedAlarmDeduplicationService.deduplicate
+  - symbol: FederatedAlarmCorrelationService.correlate
+  - symbol: CorrelationRuleMatcher.match
+  - symbol: FederatedCorrelationEngine.correlate
+  - symbol: FederatedAlarmRepository.save
+  - symbol: AlarmFederationEventPublisher.publish
+
+expected_call_chain:
+  - step: 1
+    symbol: FederatedAlarmIngestController.ingestAlarm
+    route: POST /api/federated/alarms
+    file: alarm-federated-service/.../controller/FederatedAlarmIngestController.java
+  - step: 2
+    symbol: AlarmIngestionService.ingest
+    file: alarm-federated-service/.../service/AlarmIngestionService.java
+    side_effect: "Validates source, resolves source registry"
+  - step: 3
+    symbol: FederatedAlarmSourceRegistry.resolve
+    file: alarm-federated-service/.../repository/FederatedAlarmSourceRegistry.java
+    side_effect: "Identifies alarm source region/vendor"
+  - step: 4
+    symbol: FederatedAlarmAggregationService.aggregate
+    file: alarm-federated-service/.../service/FederatedAlarmAggregationService.java
+    side_effect: "Selects aggregation strategy based on alarm type"
+  - step: 5
+    symbol: AggregationStrategy.aggregate
+    file: alarm-federated-service/.../aggregation/*AggregationStrategy.java
+    side_effect: "Polymorphic aggregation"
+  - step: 6
+    symbol: FederatedAlarmDeduplicationService.deduplicate
+    file: alarm-federated-service/.../service/FederatedAlarmDeduplicationService.java
+    side_effect: "Checks for duplicate federated alarms"
+  - step: 7
+    symbol: FederatedAlarmCorrelationService.correlate
+    file: alarm-federated-service/.../service/FederatedAlarmCorrelationService.java
+    side_effect: "Cross-region alarm correlation"
+  - step: 8
+    symbol: CorrelationRuleMatcher.match
+    file: alarm-federated-service/.../correlation/CorrelationRuleMatcher.java
+    side_effect: "Applies correlation rules"
+  - step: 9
+    symbol: FederatedCorrelationEngine.correlate
+    file: alarm-federated-service/.../correlation/FederatedCorrelationEngine.java
+    side_effect: "Advanced correlation logic"
+  - step: 10
+    symbol: FederatedAlarmRepository.save
+    file: alarm-federated-service/.../repository/FederatedAlarmRepository.java
+    side_effect: "WRITE: stores federated alarm in memory"
+  - step: 11
+    symbol: AlarmFederationEventPublisher.publish
+    file: alarm-federated-service/.../event/AlarmFederationEventPublisher.java
+    side_effect: "Publishes federated alarm event"
+
+not_in_chain:
+  - AlarmEvaluationService (alarm-engine, non-federated)
+  - AlarmCorrelationService (alarm-engine, non-federated)
+  - AlarmDeduplicationService (alarm-engine, non-federated)
+  - DeviceMetricEventConsumer (alarm-engine, metric flow)
+
+verification: mvn -pl alarm-federated-service test

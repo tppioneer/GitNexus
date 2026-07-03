@@ -1,0 +1,17 @@
+id: telecom-case-z-notification-retry-loss-bug
+name: Telecom exhausted notification retry not recorded bug
+level: L2
+task_type: bug_localization
+repo: telecom-ops-platform
+status: reviewed
+
+prompt: |
+  回归现象：通知渠道连续失败直到达到最大重试次数后，重试方法返回失败，但失败记录仓库仍为空，运维页面看到的失败计数也是 0。
+  请定位重试次数与失败落库条件之间的问题，说明完整失败路径，并给出覆盖边界次数的确定性测试。
+  不要修改代码，只输出根因、证据、影响和验证建议。
+
+extra_desc: |
+  人工审阅提示，不进入公开载荷：检查 process 的循环边界、retry 的 attemptNumber > maxRetries 条件和 NotificationFailureRepository.save 的可达性。
+
+ground_truth: docs/benchmark/v2/telecom/ground-truth/telecom-case-z-ground-truth.yaml
+

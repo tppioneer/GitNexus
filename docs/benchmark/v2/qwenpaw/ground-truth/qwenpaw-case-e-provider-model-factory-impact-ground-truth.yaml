@@ -1,0 +1,76 @@
+case_id: qwenpaw-case-e-provider-model-factory-impact
+task_type: impact_analysis
+
+target:
+  symbol: Provider.get_chat_model_instance
+  file: src/qwenpaw/providers/provider.py
+  current_signature: "get_chat_model_instance(self, model_id)"
+  proposed_signature: "get_chat_model_instance(self, model_id, runtime_options)"
+  graph_risk: CRITICAL
+  graph_blast_radius:
+    direct: 6
+    total_impacted_with_depth_3: 18
+    affected_modules: 7
+
+direct_overrides:
+  - symbol: AnthropicProvider.get_chat_model_instance
+    file: src/qwenpaw/providers/anthropic_provider.py
+  - symbol: GeminiProvider.get_chat_model_instance
+    file: src/qwenpaw/providers/gemini_provider.py
+  - symbol: OpenAIProvider.get_chat_model_instance
+    file: src/qwenpaw/providers/openai_provider.py
+  - symbol: OpenRouterProvider.get_chat_model_instance
+    file: src/qwenpaw/providers/openrouter_provider.py
+  - symbol: _StubProvider.get_chat_model_instance
+    file: tests/unit/providers/test_provider_class_identity.py
+
+transitive_inheritance:
+  - symbol: OllamaProvider.get_chat_model_instance
+    file: src/qwenpaw/providers/ollama_provider.py
+    reason: Overrides OpenAIProvider's override and must accept the new contract.
+  - symbol: LMStudioProvider
+    file: src/qwenpaw/providers/lmstudio_provider.py
+    reason: Inherits OpenAIProvider behavior without its own override; verify propagation but do not invent a method edit.
+
+direct_callers:
+  - symbol: create_model_and_formatter
+    file: src/qwenpaw/agents/model_factory.py
+    reason: Calls the provider directly for agent-specific model slots.
+  - symbol: ProviderManager.get_active_chat_model
+    file: src/qwenpaw/providers/provider_manager.py
+    reason: Calls the provider on the global active-model fallback path.
+
+indirect_consumers:
+  - symbol: QwenPawAgent.__init__
+    file: src/qwenpaw/agents/react_agent.py
+  - symbol: LightContextManager.compact_context
+    file: src/qwenpaw/agents/context/light_context_manager.py
+  - symbol: ReMeLightMemoryManager.summarize
+    file: src/qwenpaw/agents/memory/reme_light_memory_manager.py
+  - symbol: ReMeLightMemoryManager.dream
+    file: src/qwenpaw/agents/memory/reme_light_memory_manager.py
+  - symbol: _initialize_single_proactive_agent
+    file: src/qwenpaw/agents/memory/proactive/proactive_responder.py
+  - symbol: generate_and_update_title
+    file: src/qwenpaw/app/runner/title_generator.py
+  - symbol: skills_stream.get_model
+    file: src/qwenpaw/app/routers/skills_stream.py
+
+must_mention:
+  - create_model_and_formatter prefers an agent-specific active_model and otherwise uses ProviderManager.get_active_chat_model.
+  - Runtime options must be applied consistently on both model-selection paths.
+  - OllamaProvider is a transitive override through OpenAIProvider, while LMStudioProvider inherits the OpenAI implementation.
+  - Formatter selection and TokenRecordingModelWrapper/RetryChatModel wrapping occur after model construction and should not be mistaken for provider implementations.
+
+must_exclude_from_impact:
+  - symbol: TokenRecordingModelWrapper
+    reason: Post-construction wrapper, not a provider implementation. Signature change does not affect it.
+  - symbol: RetryChatModel
+    reason: Post-construction wrapper, not a provider implementation.
+  - symbol: get_active_model_supports_multimodal
+    reason: Independent model capability query, unaffected by get_chat_model_instance signature change.
+
+recommended_validation:
+  - python -m pytest tests/unit/providers
+  - python -m pytest tests/unit/agents tests/unit/app/test_title_generator.py
+

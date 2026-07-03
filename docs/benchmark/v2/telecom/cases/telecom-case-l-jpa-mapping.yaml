@@ -1,0 +1,40 @@
+id: telecom-case-l-jpa-mapping
+name: Telecom JPA entity mapping and repository query analysis
+level: L2
+task_type: framework_structure
+repo: telecom-ops-platform
+status: draft-ground-truth
+
+prompt: |
+  请从 NetworkChangeEntity 出发，分析 network-change-service 中所有 JPA entity 的 table、column、embedded、relationship 和 version 映射。
+  继续追踪 ChangePlanService 和 ChangeAuditService 到 repository 的调用链，说明哪些方法是 Spring Data 派生查询、哪些是 @Query JPQL、哪些是 native query。
+  需要区分：
+  - @Entity/@Table/@Id/@GeneratedValue/@Column/@Enumerated 等映射注解；
+  - @Embedded 和 @Embeddable 值对象；
+  - @OneToMany(mappedBy, cascade) 和 @ManyToOne(fetch=LAZY) 关系；
+  - @Version 乐观锁；
+  - Repository 泛型参数与 entity 的绑定；
+  - 派生查询、JPQL 和 native SQL 的来源；
+  - ChangeRecordDto（有 tableName 字段但不是 entity）等负例。
+  字符串形式的 JPQL 或 SQL 关系要标明来源，不得伪装成普通 Java 直接调用。
+
+graph_queries:
+  - 'context({name: "NetworkChangeEntity"})'
+  - 'context({name: "NetworkChangeJpaRepository"})'
+
+grep_searches:
+  - rg "@Entity|@Table|@Column|@OneToMany|@ManyToOne|@Embedded|@Embeddable|@Version"
+  - rg "extends JpaRepository|@Query"
+
+ground_truth: docs/benchmark/v2/telecom/ground-truth/telecom-case-l-ground-truth.yaml
+
+risk_level: LOW
+
+scoring:
+  must_identify:
+    - 5 个 entity/embeddable 类型
+    - 2 个 JPA repository
+    - 派生查询、JPQL、native query
+  must_exclude:
+    - ChangeRecordDto
+    - InMemoryChangeSnapshotStore

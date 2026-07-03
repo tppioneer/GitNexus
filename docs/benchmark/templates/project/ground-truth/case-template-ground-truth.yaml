@@ -1,0 +1,26 @@
+case_id: REPLACE_PROJECT_SLUG-case-a-REPLACE_CASE_SLUG
+ground_truth_type: impact_analysis
+truth_version: "1.0"
+status: draft-ground-truth
+
+target:
+  symbol: REPLACE_TARGET_SYMBOL
+  file: REPLACE_FULL_REPOSITORY_RELATIVE_PATH
+
+expected_symbols:
+  - symbol: REPLACE_EXPECTED_SYMBOL
+    file: REPLACE_FULL_REPOSITORY_RELATIVE_PATH
+    reason: "REPLACE_WHY_THIS_SYMBOL_IS_IN_SCOPE"
+
+expected_call_chains:
+  - name: REPLACE_CHAIN_NAME
+    symbols:
+      - symbol: REPLACE_ENTRY_SYMBOL
+      - symbol: REPLACE_TARGET_SYMBOL
+
+exclude_from_impact:
+  - symbol: REPLACE_FALSE_POSITIVE_SYMBOL
+    reason: "REPLACE_WHY_SAME_NAME_OR_NEARBY_CODE_IS_OUT_OF_SCOPE"
+
+recommended_tests:
+  - REPLACE_VALIDATION_COMMAND

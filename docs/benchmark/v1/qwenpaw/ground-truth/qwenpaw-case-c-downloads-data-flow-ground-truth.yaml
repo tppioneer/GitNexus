@@ -1,0 +1,90 @@
+case_id: qwenpaw-case-c-downloads-data-flow
+task_type: flow_tracing
+
+expected_entrypoints:
+  - symbol: App
+    file: website/src/App.tsx
+    reason: Defines React Router routes and maps /downloads to Downloads.
+  - symbol: Downloads
+    file: website/src/pages/Downloads.tsx
+    reason: Main downloads page component and metadata loading flow.
+
+expected_symbols:
+  - symbol: BrowserRouter
+    file: website/src/main.tsx
+    reason: Provides routing context for App routes.
+  - symbol: SiteConfigProvider
+    file: website/src/App.tsx
+    reason: Wraps routes with loaded site config.
+  - symbol: loadSiteConfig
+    file: website/src/config.ts
+    reason: Loads site.config.json and provides docsPath/default config.
+  - symbol: useSiteConfig
+    file: website/src/config-context.tsx
+    reason: Downloads uses docsPath for documentation links.
+  - symbol: CDN_BASE
+    file: website/src/pages/Downloads.tsx
+    reason: Base URL for download metadata and files.
+  - symbol: Downloads.loadDownloads
+    file: website/src/pages/Downloads.tsx
+    reason: Fetches main index, desktop index, and plugins index.
+  - symbol: FileMetadata
+    file: website/src/pages/Downloads.tsx
+    reason: Download file metadata shape used by desktop and plugin cards.
+  - symbol: DesktopIndex
+    file: website/src/pages/Downloads.tsx
+    reason: Product metadata shape with platforms and files.
+  - symbol: MainIndex
+    file: website/src/pages/Downloads.tsx
+    reason: CDN main index interface; first fetch target containing product index_url values.
+  - symbol: LocalizedText
+    file: website/src/pages/Downloads.tsx
+    reason: Type for bilingual fields {zh-CN, en-US}; used by FileMetadata name and description.
+  - symbol: pickLocalizedField
+    file: website/src/pages/Downloads.tsx
+    reason: Selects zh-CN or en-US from LocalizedText based on i18n language; used by PluginCard.
+  - symbol: isPreviewVersion
+    file: website/src/pages/Downloads.tsx
+    reason: Filters preview/alpha/beta versions; called by compareVersionDesc and latestFileIdByPluginId.
+  - symbol: compareVersionDesc
+    file: website/src/pages/Downloads.tsx
+    reason: Sorts versions descending while pushing preview builds after stable builds.
+  - symbol: latestFileIdByPluginId
+    file: website/src/pages/Downloads.tsx
+    reason: Chooses latest stable plugin file per plugin id.
+  - symbol: groupFilesByPluginId
+    file: website/src/pages/Downloads.tsx
+    reason: Groups plugin versions before rendering plugin cards.
+  - symbol: detectOS
+    file: website/src/pages/Downloads.tsx
+    reason: Marks platform recommendation by user OS.
+  - symbol: PlatformCard
+    file: website/src/pages/Downloads.tsx
+    reason: Renders desktop download versions and selected file metadata.
+  - symbol: PluginCard
+    file: website/src/pages/Downloads.tsx
+    reason: Renders plugin download versions and localized metadata.
+  - symbol: PluginsSection
+    file: website/src/pages/Downloads.tsx
+    reason: Organizes plugin files by kind and plugin id.
+
+expected_files:
+  - file: website/src/main.tsx
+  - file: website/src/App.tsx
+  - file: website/src/config.ts
+  - file: website/src/config-context.tsx
+  - file: website/src/pages/Downloads.tsx
+
+must_mention:
+  - /downloads route is declared in App.tsx under SiteLayout showFooter.
+  - Downloads calls useSiteConfig and derives docsBase from docsPath.
+  - loadDownloads first fetches metadata/index.json from CDN_BASE, typed as MainIndex.
+  - desktop and plugins indexes are fetched from MainIndex products' index_url values.
+  - version ordering prefers latest stable over preview builds via isPreviewVersion filter.
+  - plugin files are grouped by plugin_id, with id fallback.
+  - pickLocalizedField selects zh-CN or en-US from LocalizedText fields based on i18n.resolvedLanguage.
+  - metadata schema changes affect TypeScript interfaces (FileMetadata, DesktopIndex, MainIndex, LocalizedText) and rendering components.
+
+recommended_validation:
+  - cd website && pnpm exec tsc -b --noEmit
+  - cd website && pnpm run build

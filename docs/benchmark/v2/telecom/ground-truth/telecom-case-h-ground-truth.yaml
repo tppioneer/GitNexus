@@ -1,0 +1,190 @@
+case_id: telecom-case-h-spring-route-matrix
+task_type: structure_extraction
+truth_version: '2.1'
+ground_truth_status: draft
+source_commit: 5c2fdcdf9e3b7829fc8ace183e2b0876ccbb188a
+source_dirty: true
+source_scope_clean: true
+source_project: telecom-ops-platform
+source_module: network-change-service
+reviewed_at: '2026-07-20'
+analysis_scope: src/main/java only
+expected_entrypoints:
+- id: ep.network-change-controller
+  symbol: NetworkChangeController
+  file: network-change-service/src/main/java/com/example/telecom/change/controller/NetworkChangeController.java
+- id: ep.legacy-controller
+  symbol: LegacyNetworkChangeController
+  file: network-change-service/src/main/java/com/example/telecom/change/controller/LegacyNetworkChangeController.java
+- id: ep.composed-controller
+  symbol: ComposedEndpointController
+  file: network-change-service/src/main/java/com/example/telecom/change/controller/ComposedEndpointController.java
+- id: ep.mvc-conditions-controller
+  symbol: MvcConditionsController
+  file: network-change-service/src/main/java/com/example/telecom/change/controller/MvcConditionsController.java
+expected_symbols:
+- id: sym.change-routes
+  symbol: ChangeRoutes
+  file: network-change-service/src/main/java/com/example/telecom/change/controller/ChangeRoutes.java
+- id: sym.ops-read-endpoint
+  symbol: OpsReadEndpoint
+  file: network-change-service/src/main/java/com/example/telecom/change/annotation/OpsReadEndpoint.java
+- id: sym.change-plan-service
+  symbol: ChangePlanService
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangePlanService.java
+- id: sym.change-plan-query-service
+  symbol: ChangePlanQueryService
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangePlanQueryService.java
+expected_facts:
+- id: fact.route-count
+  description: network-change-service exposes 19 routes total across 4 controllers
+- id: fact.four-controllers
+  description: 'Four controllers: NetworkChangeController, LegacyNetworkChangeController, ComposedEndpointController, MvcConditionsController'
+- id: fact.class-prefix-composition
+  description: NetworkChangeController, ComposedEndpointController, and MvcConditionsController have class-level @RequestMapping prefix /api/network-changes
+- id: fact.legacy-no-prefix
+  description: LegacyNetworkChangeController has no class-level @RequestMapping prefix
+- id: fact.r08-array-expansion
+  description: R08 @GetMapping({/active, /open}) expands to two separate routes with the same handler listActive
+- id: fact.r09-composed-only
+  description: R09 uses only @OpsReadEndpoint which carries @RequestMapping(method=GET) as meta-annotation — no backup @GetMapping needed
+- id: fact.r10-fully-qualified
+  description: R10 uses fully-qualified @org.springframework.web.bind.annotation.GetMapping resolving to the same mapping as short-name
+- id: fact.r11-constant-path
+  description: R11 path comes from ChangeRoutes.PENDING constant value /pending
+- id: fact.r12-no-method-path
+  description: R12 @GetMapping with no path resolves to class prefix /api/network-changes only
+- id: fact.r13-produces
+  description: R13 uses produces=application/json condition
+- id: fact.r14-consumes
+  description: R14 uses consumes=application/xml condition
+- id: fact.r15-params
+  description: R15 uses params=region condition — requires query parameter
+- id: fact.r16-headers
+  description: R16 uses headers=X-Admin=true condition
+- id: fact.r17-multi-method
+  description: 'R17 expands to two routes: GET and POST via method={GET,POST}'
+controllers:
+- class: NetworkChangeController
+  file: network-change-service/src/main/java/com/example/telecom/change/controller/NetworkChangeController.java
+  class_prefix: /api/network-changes
+- class: LegacyNetworkChangeController
+  file: network-change-service/src/main/java/com/example/telecom/change/controller/LegacyNetworkChangeController.java
+  class_prefix: ''
+- class: ComposedEndpointController
+  file: network-change-service/src/main/java/com/example/telecom/change/controller/ComposedEndpointController.java
+  class_prefix: /api/network-changes
+- class: MvcConditionsController
+  file: network-change-service/src/main/java/com/example/telecom/change/controller/MvcConditionsController.java
+  class_prefix: /api/network-changes
+expected_routes:
+- id: R01
+  method: GET
+  path: /api/network-changes/{id}
+  handler: NetworkChangeController.getById
+- id: R02
+  method: POST
+  path: /api/network-changes
+  handler: NetworkChangeController.create
+  consumes: application/json
+- id: R03
+  method: PUT
+  path: /api/network-changes/{id}
+  handler: NetworkChangeController.update
+- id: R04
+  method: PATCH
+  path: /api/network-changes/{id}/risk
+  handler: NetworkChangeController.updateRisk
+- id: R05
+  method: DELETE
+  path: /api/network-changes/{id}
+  handler: NetworkChangeController.delete
+- id: R06
+  method: ANY
+  path: /legacy/preview
+  handler: LegacyNetworkChangeController.preview
+- id: R07
+  method: GET
+  path: /legacy/search
+  handler: LegacyNetworkChangeController.search
+- id: R08a
+  method: GET
+  path: /api/network-changes/active
+  handler: NetworkChangeController.listActive
+- id: R08b
+  method: GET
+  path: /api/network-changes/open
+  handler: NetworkChangeController.listActive
+- id: R09
+  method: GET
+  path: /api/network-changes/{id}/audit
+  handler: ComposedEndpointController.getAuditTrail
+  source: '@OpsReadEndpoint composed mapping (meta @RequestMapping(method=GET) + @AliasFor(path))'
+- id: R10
+  method: GET
+  path: /qualified
+  handler: LegacyNetworkChangeController.qualifiedEndpoint
+- id: R11
+  method: GET
+  path: /api/network-changes/pending
+  handler: NetworkChangeController.listPending
+  constant_source: ChangeRoutes.PENDING
+- id: R12
+  method: GET
+  path: /api/network-changes
+  handler: NetworkChangeController.listAll
+- id: R13
+  method: GET
+  path: /api/network-changes/{id}/summary
+  handler: MvcConditionsController.getSummary
+  produces: application/json
+- id: R14
+  method: POST
+  path: /api/network-changes/import
+  handler: MvcConditionsController.importXml
+  consumes: application/xml
+- id: R15
+  method: GET
+  path: /api/network-changes/filter
+  handler: MvcConditionsController.filterByRegion
+  params: region
+- id: R16
+  method: GET
+  path: /api/network-changes/admin
+  handler: MvcConditionsController.adminEndpoint
+  headers: X-Admin=true
+- id: R17a
+  method: GET
+  path: /api/network-changes/{id}/toggle
+  handler: MvcConditionsController.toggle
+- id: R17b
+  method: POST
+  path: /api/network-changes/{id}/toggle
+  handler: MvcConditionsController.toggle
+route_total: 19
+noise_items:
+- id: noise.fake-route-log
+  symbol: /api/network-changes/fake
+  reason: Log message string — NOT a route
+- id: noise.comment-only
+  symbol: '@GetMapping("/comment-only")'
+  reason: String in documentation list — NOT an annotation
+- id: noise.describe-active
+  symbol: ChangeRouteDocumentation.describe("/active")
+  reason: Documentation method call — NOT a route
+- id: noise.unused-constants
+  symbol: ChangeRoutes.DRAFT
+  reason: Constants used in documentation/logs only — NOT mapped to any handler
+- id: noise.legacy-search-overload
+  symbol: LegacyNetworkChangeController.search(String, String)
+  reason: Same method name as R07 handler but no mapping annotation — NOT a route
+- id: noise.composed-audit-overload
+  symbol: ComposedEndpointController.getAuditTrail(String, String)
+  reason: Same method name as R09 handler but no mapping annotation — NOT a route
+dimension_weights:
+  routes: 50
+  symbols: 20
+  facts: 20
+  noise: 10
+recommended_validation:
+- mvn -pl network-change-service -am test -Dtest=CaseHRouteMatrixTest,MvcConditionsControllerTest -Dsurefire.failIfNoSpecifiedTests=false

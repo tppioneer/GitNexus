@@ -1,0 +1,57 @@
+case_id: qwenpaw-case-b-plugin-loader-impact
+task_type: impact_analysis
+
+expected_symbols:
+  - symbol: PluginLoader
+    file: src/qwenpaw/plugins/loader.py
+    reason: Main class for plugin discovery, load, install, unload, and cleanup.
+  - symbol: PluginLoader.discover_plugins
+    file: src/qwenpaw/plugins/loader.py
+    reason: Scans plugin directories and reads plugin.json manifests.
+  - symbol: PluginLoader._load_manifest
+    file: src/qwenpaw/plugins/loader.py
+    reason: Converts JSON manifest into PluginManifest.
+  - symbol: PluginLoader.load_plugin
+    file: src/qwenpaw/plugins/loader.py
+    reason: Validates backend/frontend entries, dynamically imports backend plugin, registers plugin API, and stores PluginRecord.
+  - symbol: PluginLoader.load_plugin_from_path
+    file: src/qwenpaw/plugins/loader.py
+    reason: Copies plugin source, installs requirements, reloads manifest, then delegates to load_plugin.
+  - symbol: PluginLoader._install_requirements
+    file: src/qwenpaw/plugins/loader.py
+    reason: Installs plugin dependencies through pip and falls back to uv when pip is missing.
+  - symbol: PluginLoader.unload_plugin
+    file: src/qwenpaw/plugins/loader.py
+    reason: Executes shutdown hooks, removes sys.modules entries, unregisters plugin, cleans tools, and optionally deletes files.
+  - symbol: PluginLoader._cleanup_plugin_tools
+    file: src/qwenpaw/plugins/loader.py
+    reason: Removes plugin tools exported from qwenpaw.agents.tools.
+  - symbol: PluginManifest
+    file: src/qwenpaw/plugins/architecture.py
+    reason: Defines plugin manifest fields consumed by loader.
+  - symbol: PluginRegistry
+    file: src/qwenpaw/plugins/registry.py
+    reason: Registry updated during plugin load and cleanup.
+  - symbol: PluginApi
+    file: src/qwenpaw/plugins/api.py
+    reason: API object passed to plugin.register.
+
+expected_files:
+  - file: src/qwenpaw/plugins/loader.py
+  - file: src/qwenpaw/plugins/architecture.py
+  - file: src/qwenpaw/plugins/registry.py
+  - file: src/qwenpaw/plugins/api.py
+  - file: tests
+
+must_mention:
+  - discover_plugins only considers directories containing plugin.json.
+  - load_plugin permits frontend-only plugins when backend entry is absent or missing but frontend entry exists.
+  - backend loading uses importlib.util.spec_from_file_location and a plugin_<id> module name.
+  - plugin module must export plugin and plugin must implement register(api).
+  - requirements.txt installation happens in load_plugin_from_path before load_plugin.
+  - unload_plugin removes stale sys.modules entries by prefix and unregisters plugin state.
+  - Changing manifest requirements must update manifest parsing/validation and loader tests.
+
+recommended_validation:
+  - python -m pytest tests
+  - targeted plugin loader tests for backend-only, frontend-only, missing entry, requirements install, unload cleanup

@@ -1,0 +1,100 @@
+case: telecom-large-case-b-rule-evaluator-impact
+level: L2 - impact_analysis
+title: "【50K 规模】RuleEvaluator.evaluate 接口签名变更影响分析"
+
+description: >
+  50,000 行规模。RuleEvaluator.evaluate(DeviceMetric, ThresholdRule) 是告警引擎核心接口。
+  由于项目扩容至 12 个模块，全项目共有 33+ 个 evaluate 方法。
+  需要精确区分 5 个目标实现与 28 个干扰项。
+
+task: >
+  如果给 RuleEvaluator.evaluate(DeviceMetric metric, ThresholdRule rule)
+  增加一个 EvaluationContext context 参数，需要同步检查哪些实现类、调用方、
+  测试和文档？不要修改代码，先输出完整影响分析。
+
+target_interface:
+  name: RuleEvaluator
+  file: alarm-engine-service/src/main/java/com/example/telecom/alarm/rule/RuleEvaluator.java
+  current_signature: "EvaluationResult evaluate(DeviceMetric metric, ThresholdRule rule)"
+  proposed_signature: "EvaluationResult evaluate(DeviceMetric metric, ThresholdRule rule, EvaluationContext context)"
+
+target_implementations:
+  - CpuUsageRuleEvaluator (has overloaded evaluate(DeviceInfo) noise)
+  - MemoryUsageRuleEvaluator
+  - OpticalPowerRuleEvaluator
+  - PacketLossRuleEvaluator
+  - TemperatureRuleEvaluator
+
+target_callers:
+  - AlarmEvaluationService (core caller, uses interface variable)
+  - RuleEvaluatorRegistry (resolves and returns RuleEvaluator)
+
+noise_evaluate_methods:
+  # alarm-engine-service (7 个干扰)
+  - SlaEvaluator.evaluate (not RuleEvaluator)
+  - RiskEvaluator.evaluate (not RuleEvaluator)
+  - SuppressionRuleEvaluator.evaluate (not RuleEvaluator)
+  - AlarmEscalationEvaluator.evaluate (not RuleEvaluator)
+  - AlarmEscalationPolicy.evaluate (AlarmEscalationPolicy interface)
+  - SeverityAlarmEscalationPolicy.evaluate (AlarmEscalationPolicy impl)
+  - DurationAlarmEscalationPolicy.evaluate (AlarmEscalationPolicy impl)
+  # workorder-service (3 个干扰)
+  - EscalationPolicy.evaluate (EscalationPolicy interface)
+  - SeverityEscalationPolicy.evaluate (EscalationPolicy impl)
+  - SlaEscalationPolicy.evaluate (EscalationPolicy impl)
+  # ops-gateway-service (4 个干扰)
+  - DashboardHealthEvaluator.evaluate (not RuleEvaluator)
+  - DeviceHealthEvaluator.evaluate (not RuleEvaluator)
+  - RegionHealthEvaluator.evaluate (not RuleEvaluator)
+  - ServiceHealthEvaluator.evaluate (not RuleEvaluator)
+  # dispatch-service (5 个干扰)
+  - DispatchRule.evaluate (DispatchRule interface)
+  - SkillMatchRule.evaluate (DispatchRule impl)
+  - LoadBalanceRule.evaluate (DispatchRule impl)
+  - ProximityRule.evaluate (DispatchRule impl)
+  - PriorityOverrideRule.evaluate (DispatchRule impl)
+  # vendor-collaboration-service (4 个干扰)
+  - VendorEvaluator.evaluate (VendorEvaluator interface)
+  - ResponseTimeVendorEvaluator.evaluate (VendorEvaluator impl)
+  - ResolutionRateVendorEvaluator.evaluate (VendorEvaluator impl)
+  - QualityScoreVendorEvaluator.evaluate (VendorEvaluator impl)
+  # device-lifecycle-service (2 个干扰)
+  - DeviceDeprecationPolicy.evaluate (not RuleEvaluator)
+  - CertificateRotationPolicy.evaluate (not RuleEvaluator)
+  # sla-engine-service (2 个干扰)
+  - SlaBreachPolicy.evaluate (not RuleEvaluator)
+  - SlaMonitoringService.evaluate (not RuleEvaluator)
+  # notification-service (1 个干扰)
+  - NotificationRuleService.evaluate (not RuleEvaluator)
+  # workorder-service (1 个额外干扰)
+  - WorkOrderStatisticsService.evaluate (not RuleEvaluator)
+
+graph_queries:
+  - 'impact({target: "evaluate", direction: "upstream"})'
+  - 'context({name: "RuleEvaluator"})'
+  - 'query({search_query: "alarm rule evaluator evaluation context"})'
+
+grep_searches:
+  - rg "interface RuleEvaluator|class .*RuleEvaluator|evaluate\\("
+  - rg "RuleEvaluatorRegistry|AlarmEvaluationService"
+  - rg "EvaluationResult|ThresholdRule"
+
+ground_truth: docs/benchmark/v1/telecom/large/ground-truth/telecom-large-case-b-ground-truth.yaml
+
+risk_level: HIGH
+
+scoring:
+  must_identify:
+    - 所有 5 个 RuleEvaluator 实现类必须同步修改
+    - AlarmEvaluationService 需要构造 EvaluationContext
+    - CpuUsageRuleEvaluator 有重载 evaluate(DeviceInfo)，需区分签名
+    - 28 个干扰 evaluate 方法都不属于目标接口，不应纳入修改范围
+    - RuleEvaluatorRegistry 需要检查类型引用
+    - 仅 alarm-engine-service 的测试受影响，其他模块测试不变
+
+  penalty_items:
+    - 把任何干扰 evaluate 方法纳入影响面（视作误报）
+    - 漏掉 CpuUsageRuleEvaluator 的重载方法评估
+    - 未区分接口实现类与独立同名方法
+    - 把其他模块的测试纳入影响面
+    - 仅列出 5 个目标实现而不提干扰项的存在

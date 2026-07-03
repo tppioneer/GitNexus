@@ -1,0 +1,67 @@
+case_id: telecom-large-case-d-dispatch-rule-impact
+task_type: impact_analysis
+
+target:
+  symbol: DispatchRule.evaluate
+  file: dispatch-service/src/main/java/com/example/telecom/dispatch/rule/DispatchRule.java
+  current_signature: "DispatchRuleResult evaluate(DispatchContext context)"
+  proposed_signature: "DispatchRuleResult evaluate(DispatchContext context, DispatchRuleOptions options)"
+  graph_risk: MEDIUM
+  graph_blast_radius:
+    direct_callers: 5
+    total_impacted_with_depth_4: 14
+    affected_process_groups: 2
+
+expected_symbols:
+  - symbol: LoadBalanceRule.evaluate
+    file: dispatch-service/.../rule/LoadBalanceRule.java
+    reason: Load-balancing implementation of DispatchRule.evaluate.
+  - symbol: PriorityOverrideRule.evaluate
+    file: dispatch-service/.../rule/PriorityOverrideRule.java
+    reason: Priority-based override implementation of DispatchRule.evaluate.
+  - symbol: ProximityRule.evaluate
+    file: dispatch-service/.../rule/ProximityRule.java
+    reason: Proximity-based implementation of DispatchRule.evaluate.
+  - symbol: SkillMatchRule.evaluate
+    file: dispatch-service/.../rule/SkillMatchRule.java
+    reason: Skill-matching implementation of DispatchRule.evaluate.
+  - symbol: DispatchRuleRegistry.evaluateAll
+    file: dispatch-service/.../rule/DispatchRuleRegistry.java
+    reason: Iterates List<DispatchRule> in priority order and calls rule.evaluate(context).
+
+indirect_entrypoints:
+  - symbol: DispatchEngine.evaluateRules
+    chain: "DispatchEngine.evaluateRules -> DispatchRuleRegistry.evaluateAll -> DispatchRule.evaluate"
+    file: dispatch-service/.../engine/DispatchEngine.java
+  - symbol: DispatchRuleService.evaluateRules
+    chain: "DispatchRuleService.evaluateRules -> DispatchRuleRegistry.evaluateAll -> DispatchRule.evaluate"
+    file: dispatch-service/.../service/DispatchRuleService.java
+  - symbol: DispatchOptimizer.optimize
+    chain: "DispatchOptimizer.optimize -> DispatchEngine.evaluateRules -> DispatchRule.evaluate"
+    file: dispatch-service/.../engine/DispatchOptimizer.java
+  - symbol: DispatchOrchestrationService.executeDispatch
+    chain: "DispatchOrchestrationService.executeDispatch -> DispatchEngine -> DispatchRule.evaluate"
+    file: dispatch-service/.../service/DispatchOrchestrationService.java
+
+must_mention:
+  - Four DispatchRule implementations must be identified.
+  - DispatchRuleRegistry.evaluateAll is the single direct interface-typed caller.
+  - DispatchEngine, DispatchRuleService, DispatchOptimizer, DispatchOrchestrationService are indirect callers.
+  - All evaluate methods outside DispatchRule (RuleEvaluator, SLA policy, device lifecycle) must be excluded.
+  - DispatchRuleServiceTest and DispatchConfig wiring must be reviewed.
+
+must_exclude_from_impact:
+  - symbol: RuleEvaluator.evaluate
+    reason: Alarm-engine interface, not DispatchRule.
+  - symbol: SlaBreachPolicy.evaluate
+    reason: SLA policy with unrelated input and output.
+  - symbol: DeviceDeprecationPolicy.evaluate
+    reason: Device lifecycle policy, not DispatchRule.
+  - symbol: AlarmEscalationPolicy.evaluate
+    reason: Alarm escalation interface in another bounded context.
+  - symbol: DispatchScoringService.calculate
+    reason: Dispatch scoring service, not a DispatchRule implementation despite similar domain.
+
+recommended_validation:
+  - mvn -pl dispatch-service test
+  - mvn test

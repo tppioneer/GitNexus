@@ -1,0 +1,38 @@
+id: telecom-case-k-transaction-boundary
+name: Telecom transaction boundary and self-invocation analysis
+level: L2
+task_type: framework_semantics
+repo: telecom-ops-platform
+status: draft-ground-truth
+
+prompt: |
+  请列出 network-change-service 中所有 @Transactional 注解的方法，说明每个方法的事务属性（propagation、readOnly、rollbackFor）。
+  需要区分：
+  - 方法级 @Transactional（如 ChangePlanService.createPlan、ChangePlanQueryService.findById、ChangeAuditService.record）；
+  - 类级 @Transactional（ChangeExecutionService 的继承行为）；
+  - 负例：ChangePlanService.preview 没有 @Transactional；
+  - 关键陷阱：ChangePlanService.approveAndRecordInternally 调用同类 recordInternal（标注 REQUIRES_NEW），
+    说明 self-invocation 是否经过 Spring 代理、REQUIRES_NEW 是否实际生效。
+  不要仅因注解存在就断言事务行为。
+
+graph_queries:
+  - 'context({name: "ChangePlanService"})'
+  - 'context({name: "ChangeAuditService"})'
+  - 'context({name: "ChangeExecutionService"})'
+
+grep_searches:
+  - rg "@Transactional"
+  - rg "Propagation\.|readOnly|rollbackFor"
+
+ground_truth: docs/benchmark/v2/telecom/ground-truth/telecom-case-k-ground-truth.yaml
+
+risk_level: MEDIUM
+
+scoring:
+  must_identify:
+    - 全部事务方法及其属性
+    - self-invocation 陷阱
+    - 负例
+  must_exclude:
+    - FakeTransactionalMarker
+    - 测试字符串中的 @Transactional

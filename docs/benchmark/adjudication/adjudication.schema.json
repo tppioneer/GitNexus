@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gitnexus.dev/schemas/benchmark/adjudication-v1.json",
+  "title": "GitNexus Benchmark Human-Approved Agent-Assisted Adjudication",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "benchmark_version", "case_id", "run_id", "agent", "tool_policy", "sources", "review", "baseline", "decisions", "result"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "benchmark_version": {"type": "string", "pattern": "^v[0-9]+$"},
+    "case_id": {"type": "string", "minLength": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "agent": {"type": "string", "minLength": 1},
+    "tool_policy": {"type": "string", "minLength": 1},
+    "sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent_result", "automatic_score", "ground_truth"],
+      "properties": {
+        "agent_result": {"$ref": "#/$defs/source"},
+        "automatic_score": {"$ref": "#/$defs/source"},
+        "ground_truth": {"$ref": "#/$defs/source"}
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "outcome", "mode", "prepared_by", "approved_by", "rubric_version"],
+      "properties": {
+        "status": {"const": "completed"},
+        "outcome": {"enum": ["accepted", "adjusted"]},
+        "mode": {"const": "human_approved_agent_assisted"},
+        "prepared_by": {"$ref": "#/$defs/preparedBy"},
+        "approved_by": {"$ref": "#/$defs/approvedBy"},
+        "rubric_version": {"const": "human-adjudication-v1"}
+      }
+    },
+    "baseline": {"$ref": "#/$defs/scoreSnapshot"},
+    "decisions": {"type": "array", "items": {"$ref": "#/$defs/decision"}},
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dimensions", "automatic_total", "adjudicated_total", "delta", "effective_total"],
+      "properties": {
+        "dimensions": {"$ref": "#/$defs/dimensions"},
+        "automatic_total": {"type": "number", "minimum": 0, "maximum": 100},
+        "adjudicated_total": {"type": "number", "minimum": 0, "maximum": 100},
+        "delta": {"type": "number", "minimum": -100, "maximum": 100},
+        "effective_total": {"type": "number", "minimum": 0, "maximum": 100}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"review": {"properties": {"outcome": {"const": "accepted"}}}}},
+      "then": {"properties": {"decisions": {"maxItems": 0}}}
+    },
+    {
+      "if": {"properties": {"review": {"properties": {"outcome": {"const": "adjusted"}}}}},
+      "then": {"properties": {"decisions": {"minItems": 1}}}
+    }
+  ],
+  "$defs": {
+    "credit": {"type": "number", "enum": [0, 0.25, 0.4, 0.5, 0.8, 1]},
+    "source": {
+      "type": "object", "additionalProperties": false, "required": ["path", "sha256"],
+      "properties": {"path": {"type": "string", "minLength": 1}, "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}}
+    },
+    "preparedBy": {
+      "type": "object", "additionalProperties": false, "required": ["type", "agent"],
+      "properties": {"type": {"const": "agent"}, "agent": {"type": "string"}, "model": {"type": "string"}, "thread_id": {"type": "string"}}
+    },
+    "approvedBy": {
+      "type": "object", "additionalProperties": false, "required": ["type", "reviewer_id", "approved_at", "approval_note"],
+      "properties": {"type": {"const": "human"}, "reviewer_id": {"type": "string"}, "approved_at": {"type": "string", "format": "date-time"}, "approval_note": {"type": "string", "minLength": 1}}
+    },
+    "dimensions": {
+      "type": "object", "additionalProperties": false,
+      "required": ["location", "symbols", "call_edges", "behavior_facts", "evidence", "noise"],
+      "properties": {
+        "location": {"type": "number", "minimum": 0, "maximum": 15},
+        "symbols": {"type": "number", "minimum": 0, "maximum": 20},
+        "call_edges": {"type": "number", "minimum": 0, "maximum": 25},
+        "behavior_facts": {"type": "number", "minimum": 0, "maximum": 20},
+        "evidence": {"type": "number", "minimum": 0, "maximum": 10},
+        "noise": {"type": "number", "minimum": 0, "maximum": 10}
+      }
+    },
+    "scoreSnapshot": {
+      "type": "object", "additionalProperties": false, "required": ["dimensions", "total"],
+      "properties": {"dimensions": {"$ref": "#/$defs/dimensions"}, "total": {"type": "number", "minimum": 0, "maximum": 100}}
+    },
+    "evidenceRef": {
+      "type": "object", "additionalProperties": false, "required": ["source", "json_pointer"],
+      "properties": {"source": {"const": "agent-result.json"}, "json_pointer": {"type": "string", "pattern": "^/"}, "excerpt": {"type": "string"}}
+    },
+    "decision": {
+      "type": "object", "additionalProperties": false,
+      "required": ["decision_id", "item_id", "dimension", "automatic", "adjudicated", "reason_code", "reason_detail", "evidence"],
+      "properties": {
+        "decision_id": {"type": "string", "pattern": "^decision\\."},
+        "item_id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"},
+        "dimension": {"enum": ["call_edges", "behavior_facts", "evidence", "noise"]},
+        "automatic": {"$ref": "#/$defs/decisionScore"},
+        "adjudicated": {"$ref": "#/$defs/decisionScore"},
+        "reason_code": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+        "reason_detail": {"type": "string", "minLength": 1},
+        "evidence": {"type": "array", "items": {"$ref": "#/$defs/evidenceRef"}}
+      }
+    },
+    "decisionScore": {
+      "type": "object", "additionalProperties": false, "required": ["credit", "max_points", "points", "outcome"],
+      "properties": {"credit": {"$ref": "#/$defs/credit"}, "max_points": {"type": "number", "minimum": 0}, "points": {"type": "number", "minimum": 0}, "outcome": {"enum": ["miss", "partial", "hit"]}}
+    }
+  }
+}

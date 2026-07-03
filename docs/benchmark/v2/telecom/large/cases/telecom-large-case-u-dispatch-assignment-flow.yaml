@@ -1,0 +1,17 @@
+id: telecom-large-case-u-dispatch-assignment-flow
+name: Telecom Large dispatch assignment execution flow
+level: L2
+task_type: flow_tracing
+repo: telecom-ops-platform-large
+status: reviewed
+
+prompt: |
+  调度 API 收到一个工单分派请求后，需要选择可用操作员、执行规则与评分、保存派单结果，并产生历史和事件。
+  请追踪正常分派、没有可用候选人和规则不通过时的完整执行流程，说明最终状态和副作用如何产生。
+  不要修改代码，只输出有证据支持的调用链、关键分支、风险和验证建议。
+
+extra_desc: |
+  人工审阅提示，不进入公开载荷：核对 DispatchController、OrchestrationService、Availability、Scoring、DispatchEngine、RuleRegistry、Repository、History、Event 和 Mapper。
+
+ground_truth: docs/benchmark/v2/telecom/large/ground-truth/telecom-large-case-u-ground-truth.yaml
+

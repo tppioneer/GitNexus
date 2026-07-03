@@ -637,6 +637,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "datasets" },
+    { name = "jsonschema" },
     { name = "litellm" },
     { name = "mini-swe-agent" },
     { name = "pandas" },
@@ -660,6 +661,7 @@ requires-dist = [
     { name = "coverage", marker = "extra == 'dev'", specifier = ">=7.6.0" },
     { name = "datasets", specifier = ">=3.0.0" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.88.0" },
+    { name = "jsonschema", specifier = ">=4.0.0" },
     { name = "litellm", specifier = "!=1.82.7,!=1.82.8,>=1.83.7" },
     { name = "mini-swe-agent", specifier = ">=2.0.0" },
     { name = "pandas", specifier = ">=2.0.0" },

@@ -1,0 +1,40 @@
+id: telecom-large-case-e-sla-calculator-impact
+name: Telecom Large SlaCalculator.calculate 签名变更影响分析
+level: L2
+task_type: impact_analysis
+repo: telecom-ops-platform-large
+status: draft-ground-truth
+
+prompt: |
+  为了给 SLA 指标计算传入报告窗口和聚合维度等上下文，计划给
+  SlaCalculator.calculate 增加一个 SlaCalculationContext 参数。
+
+  请分析这个签名变更涉及的实现、直接和间接生产调用路径、行为风险以及受影响的测试。
+  注意排除无关的同名计算方法。不要修改代码，只输出有证据支持的影响分析。
+
+extra_desc: |
+  Case 设计与人工审阅提示，不进入模型公开载荷：
+  - 核对 SlaCalculator 实现类和 Registry 调度层。
+  - 沿 Monitor、Service 和 Controller 入口检查多跳生产调用路径。
+  - 仓库中 calculate/score/evaluate 同名计算方法密集，只统计真正的 SlaCalculator 影响面。
+  - 检查受影响的测试。
+
+graph_queries:
+  - 'context({name: "SlaCalculator"})'
+  - 'impact({target: "calculate", direction: "upstream"})'
+
+grep_searches:
+  - rg "interface SlaCalculator|implements SlaCalculator|calculate\("
+  - rg "SlaCalculatorRegistry|SlaMonitor|SlaMonitoringService"
+
+
+ground_truth: docs/benchmark/v2/telecom/large/ground-truth/telecom-large-case-e-ground-truth.yaml
+
+risk_level: HIGH
+
+scoring:
+  must_identify:
+    - 4 个 SlaCalculator 实现
+    - SlaCalculatorRegistry.calculateAll 直接接口调用
+    - SlaMonitor.evaluateMetrics/monitor 与两个 Controller 入口
+    - SlaCalculatorTest 和 SlaMonitorTest

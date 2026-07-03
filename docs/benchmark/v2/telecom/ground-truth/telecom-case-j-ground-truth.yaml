@@ -1,0 +1,239 @@
+additional_injection_points:
+- class: DefaultExecutorFacade
+  file: network-change-service/src/main/java/com/example/telecom/change/executor/DefaultExecutorFacade.java
+  id: j.additional_injection_points.defaultexecutorfacade
+  injection:
+  - parameter: defaultExecutor
+    qualifier: none
+    reason: '@Primary on RadioChangeExecutor resolves bare injection'
+    runtime_target: RadioChangeExecutor
+    static_target: ChangeExecutor
+    type: ChangeExecutor
+  - injection_style: field
+    parameter: legacyExecutor
+    qualifier: '@Qualifier("routerExecutor")'
+    reason: Field @Autowired + @Qualifier selects RouterChangeExecutor
+    runtime_target: RouterChangeExecutor
+    type: ChangeExecutor
+- class: LegacyChangeFacade
+  file: network-change-service/src/main/java/com/example/telecom/change/service/LegacyChangeFacade.java
+  id: j.additional_injection_points.legacychangefacade
+  injection:
+  - injection_style: field
+    parameter: legacyExecutor
+    qualifier: '@Qualifier("routerExecutor")'
+    runtime_target: RouterChangeExecutor
+    type: ChangeExecutor
+- class: ChangeExecutorRegistry
+  file: network-change-service/src/main/java/com/example/telecom/change/executor/ChangeExecutorRegistry.java
+  id: j.additional_injection_points.changeexecutorregistry
+  injection:
+  - parameter: candidates
+    qualifier: '@ChangeExecutorCandidate'
+    runtime_members:
+    - RouterChangeExecutor
+    - TransmissionChangeExecutor
+    - RadioChangeExecutor
+    type: List<ChangeExecutor>
+all_change_executor_beans:
+- annotations:
+  - '@Component'
+  - '@ChangeExecutorCandidate'
+  bean_name: routerExecutor
+  class: RouterChangeExecutor
+  supports: ROUTER
+- annotations:
+  - '@Component'
+  - '@ChangeExecutorCandidate'
+  bean_name: transmissionExecutor
+  class: TransmissionChangeExecutor
+  supports: TRANSMISSION
+- annotations:
+  - '@Primary'
+  - '@Component'
+  - '@ChangeExecutorCandidate'
+  bean_name: radioExecutor
+  class: RadioChangeExecutor
+  supports: RADIO
+- annotations:
+  - '@Component'
+  bean_name: safeExecutor
+  class: SafeChangeExecutor
+  note: No @ChangeExecutorCandidate
+  supports: ALL
+- annotations:
+  - '@Profile("dry-run")'
+  - '@Component'
+  - '@ChangeExecutorCandidate'
+  bean_name: (generated)
+  class: DryRunChangeExecutor
+  condition: Only active under dry-run profile
+  supports: ALL
+- annotations:
+  - '@Bean in @Profile("benchmark") config'
+  bean_name: benchmarkExecutor
+  class: (anonymous in ChangeExecutorConfiguration)
+  condition: Only active under benchmark profile
+  supports: ALL
+case_id: telecom-case-j-spring-di-selection
+expected_entrypoints:
+- file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeExecutionService.java
+  id: ep.change-execution-service
+  symbol: ChangeExecutionService
+- file: network-change-service/src/main/java/com/example/telecom/change/executor/ChangeExecutorRegistry.java
+  id: ep.change-executor-registry
+  symbol: ChangeExecutorRegistry
+expected_facts:
+- description: RadioChangeExecutor is @Primary so bare ChangeExecutor injection resolves to RadioChangeExecutor
+  id: fact.primary-radio
+- description: '@Qualifier(safeExecutor) selects SafeChangeExecutor for the safeExecutor parameter'
+  id: fact.qualifier-safe
+- description: '@ChangeExecutorCandidate List excludes SafeChangeExecutor because it lacks the annotation'
+  id: fact.candidate-excludes-safe
+- description: Under benchmark profile DryRunChangeExecutor is excluded because @Profile(dry-run) is not active
+  id: fact.candidate-excludes-dryrun-benchmark
+- description: Map<String,ChangeExecutor> injection collects ALL ChangeExecutor beans including safeExecutor and benchmarkExecutor
+  id: fact.map-includes-all
+- description: ObjectProvider<RollbackHandler> only provides StandardRollbackHandler because RemoteRollbackHandler requires telecom.change.remote.enabled=true
+  id: fact.rollback-standard-only
+- description: LegacyChangeFacade uses @Autowired @Qualifier(routerExecutor) field injection resolving to RouterChangeExecutor
+  id: fact.legacy-field-router
+expected_symbols:
+- file: network-change-service/src/main/java/com/example/telecom/change/executor/SafeChangeExecutor.java
+  id: sym.safe-executor
+  symbol: SafeChangeExecutor
+- file: network-change-service/src/main/java/com/example/telecom/change/executor/RouterChangeExecutor.java
+  id: sym.router-executor
+  symbol: RouterChangeExecutor
+- file: network-change-service/src/main/java/com/example/telecom/change/executor/TransmissionChangeExecutor.java
+  id: sym.transmission-executor
+  symbol: TransmissionChangeExecutor
+- file: network-change-service/src/main/java/com/example/telecom/change/executor/RadioChangeExecutor.java
+  id: sym.radio-executor
+  symbol: RadioChangeExecutor
+- file: network-change-service/src/main/java/com/example/telecom/change/executor/DryRunChangeExecutor.java
+  id: sym.dry-run-executor
+  symbol: DryRunChangeExecutor
+- file: network-change-service/src/main/java/com/example/telecom/change/executor/DefaultExecutorFacade.java
+  id: sym.default-executor-facade
+  symbol: DefaultExecutorFacade
+- file: network-change-service/src/main/java/com/example/telecom/change/service/LegacyChangeFacade.java
+  id: sym.legacy-change-facade
+  symbol: LegacyChangeFacade
+ground_truth_status: draft
+injection_parameters:
+- description: Standard @Qualifier selects SafeChangeExecutor by bean name
+  id: j.injection_parameters.safeexecutor
+  parameter: safeExecutor
+  qualifier: '@Qualifier("safeExecutor")'
+  runtime_target: SafeChangeExecutor
+  runtime_target_bean_name: safeExecutor
+  static_target: ChangeExecutor
+  type: ChangeExecutor
+- custom_qualifier: true
+  excluded:
+  - bean_name: safeExecutor
+    class: SafeChangeExecutor
+    reason: Not annotated with @ChangeExecutorCandidate — excluded from custom qualifier collection
+  - class: DryRunChangeExecutor
+    reason: '@Profile("dry-run") — not active under benchmark profile'
+  - bean_name: benchmarkExecutor
+    class: (anonymous in ChangeExecutorConfiguration)
+    reason: Not annotated with @ChangeExecutorCandidate
+  id: j.injection_parameters.executors
+  parameter: executors
+  qualifier: '@ChangeExecutorCandidate'
+  runtime_members:
+  - bean_name: routerExecutor
+    class: RouterChangeExecutor
+    file: network-change-service/src/main/java/com/example/telecom/change/executor/RouterChangeExecutor.java
+  - bean_name: transmissionExecutor
+    class: TransmissionChangeExecutor
+    file: network-change-service/src/main/java/com/example/telecom/change/executor/TransmissionChangeExecutor.java
+  - bean_name: radioExecutor
+    class: RadioChangeExecutor
+    file: network-change-service/src/main/java/com/example/telecom/change/executor/RadioChangeExecutor.java
+  type: List<ChangeExecutor>
+- description: Map injection collects ALL ChangeExecutor beans regardless of @ChangeExecutorCandidate
+  id: j.injection_parameters.executorbeans
+  parameter: executorBeans
+  qualifier: none
+  runtime_members:
+  - bean_name: routerExecutor
+    class: RouterChangeExecutor
+  - bean_name: transmissionExecutor
+    class: TransmissionChangeExecutor
+  - bean_name: radioExecutor
+    class: RadioChangeExecutor
+  - bean_name: safeExecutor
+    class: SafeChangeExecutor
+  - bean_name: benchmarkExecutor
+    class: (anonymous in ChangeExecutorConfiguration)
+  type: Map<String, ChangeExecutor>
+- available_candidates:
+  - bean_name: standardRollbackHandler
+    class: StandardRollbackHandler
+    file: network-change-service/src/main/java/com/example/telecom/change/executor/StandardRollbackHandler.java
+  excluded:
+  - bean_name: remoteRollbackHandler
+    class: RemoteRollbackHandler
+    reason: '@ConditionalOnProperty(telecom.change.remote.enabled=true) — not active in benchmark profile'
+  id: j.injection_parameters.rollbackhandlerprovider
+  parameter: rollbackHandlerProvider
+  qualifier: none
+  type: ObjectProvider<RollbackHandler>
+injection_point:
+  class: ChangeExecutionService
+  constructor: true
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeExecutionService.java
+noise_items:
+- id: noise.j-unrelatedexecuteservice-0
+  reason: Does not implement ChangeExecutor — not a DI candidate
+  symbol: UnrelatedExecuteService.execute
+- id: noise.j-changeexecutorconfiguration-1
+  reason: Anonymous class bean — not annotated with @ChangeExecutorCandidate
+  symbol: ChangeExecutorConfiguration.benchmarkExecutor
+profile: benchmark
+profile_comparison:
+  benchmark:
+    dry_run_excluded: true
+    executors_active:
+    - RouterChangeExecutor
+    - TransmissionChangeExecutor
+    - RadioChangeExecutor
+    - SafeChangeExecutor
+    remote_handler_excluded: true
+  dry-run:
+    dry_run_included: true
+    executors_active:
+    - RouterChangeExecutor
+    - TransmissionChangeExecutor
+    - RadioChangeExecutor
+    - SafeChangeExecutor
+    - DryRunChangeExecutor
+    remote_handler_condition: telecom.change.remote.enabled=true would activate RemoteRollbackHandler
+property_context:
+  telecom.change.remote.enabled: 'false'
+recommended_validation:
+- mvn -pl network-change-service -am test -Dtest=CaseJDependencySelectionTest,CaseJDryRunProfileTest
+task_type: framework_dispatch
+test_classes:
+- file: network-change-service/src/test/java/com/example/telecom/change/service/CaseJDependencySelectionTest.java
+  name: CaseJDependencySelectionTest
+  profile: benchmark
+- file: network-change-service/src/test/java/com/example/telecom/change/service/CaseJDryRunProfileTest.java
+  name: CaseJDryRunProfileTest
+  profile: dry-run
+truth_version: '2.1'
+source_commit: 5c2fdcdf9e3b7829fc8ace183e2b0876ccbb188a
+source_dirty: true
+source_scope_clean: true
+source_project: telecom-ops-platform
+source_module: network-change-service
+reviewed_at: '2026-07-20'
+analysis_scope: src/main/java only
+dimension_weights:
+  di_selection: 40
+  symbols: 25
+  facts: 25
+  noise: 10

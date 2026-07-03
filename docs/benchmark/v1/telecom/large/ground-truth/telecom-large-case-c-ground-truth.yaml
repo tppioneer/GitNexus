@@ -1,0 +1,143 @@
+case: telecom-large-case-c
+ground_truth_type: small_code_change
+truth_version: "2.0"
+project_scale: "50K"
+expected_files:
+  - file: common-domain/.../device/DeviceInfo.java
+  - file: common-domain/.../device/DeviceMetricEvent.java
+  - file: common-domain/.../alarm/AlarmRecord.java
+  - file: common-domain/.../alarm/AlarmEvent.java
+  - file: common-domain/.../workorder/WorkOrder.java
+  - file: device-collector-service/.../mapper/DeviceMetricMapper.java
+  - file: device-collector-service/.../service/DeviceRegistryService.java
+  - file: alarm-engine-service/.../mapper/AlarmRecordMapper.java
+  - file: alarm-engine-service/.../service/AlarmEvaluationService.java
+  - file: workorder-service/.../service/AutoWorkOrderService.java
+  - file: ops-gateway-service/.../service/DashboardAggregationService.java
+  - file: ops-gateway-service/.../mapper/DashboardResponseMapper.java
+  - file: src/test/resources/fixtures/device-info/base-station-huawei.json
+  - file: src/test/resources/fixtures/device-metric/cpu-critical.json
+  - file: src/test/resources/fixtures/alarm/alarm-critical-region-east.json
+  - file: src/test/resources/fixtures/workorder/auto-created-critical-alarm.json
+  - file: src/test/resources/fixtures/dashboard/device-health-summary.json
+expected_symbols:
+  - symbol: DeviceInfo.regionCode
+  - symbol: DeviceMetricEvent.deviceRegionCode
+  - symbol: AlarmRecord.alarmRegionCode
+  - symbol: AlarmEvent.deviceRegionCode
+  - symbol: WorkOrder.maintenanceRegionCode
+  - symbol: DeviceMetricMapper
+  - symbol: DeviceRegistryService
+  - symbol: AlarmRecordMapper
+  - symbol: AlarmEvaluationService
+  - symbol: AutoWorkOrderService
+  - symbol: DashboardAggregationService
+  - symbol: DashboardResponseMapper
+
+note: >
+  核心传播链不变。50K 规模下干扰 regionCode 字段从 3 个扩展到 11 个，
+  分布在 6 个新增模块中。grep "regionCode" 的结果从 ~30 处增加到 80+ 处。
+
+target:
+  symbol: DeviceInfo.regionCode
+  new_name: maintenanceRegionCode
+  file: common-domain/src/main/java/com/example/telecom/common/device/DeviceInfo.java
+  semantic: "设备维护区域源字段"
+
+must_modify:
+  # common-domain 核心类
+  - symbol: DeviceInfo.regionCode
+    file: common-domain/.../device/DeviceInfo.java
+    change: "rename to maintenanceRegionCode"
+  - symbol: DeviceMetricEvent.deviceRegionCode
+    file: common-domain/.../device/DeviceMetricEvent.java
+    change: "update getter/setter if method-named, or update field reference"
+  - symbol: AlarmRecord.alarmRegionCode
+    file: common-domain/.../alarm/AlarmRecord.java
+    change: "update if derived from DeviceInfo.regionCode"
+  - symbol: AlarmEvent.deviceRegionCode
+    file: common-domain/.../alarm/AlarmEvent.java
+    change: "update if derived from AlarmRecord.alarmRegionCode"
+  - symbol: WorkOrder.maintenanceRegionCode
+    file: common-domain/.../workorder/WorkOrder.java
+    change: "update if derived from AlarmEvent.deviceRegionCode"
+
+  # device-collector-service
+  - symbol: DeviceMetricMapper
+    file: device-collector-service/.../mapper/DeviceMetricMapper.java
+    change: "update DeviceInfo.regionCode -> DeviceMetricEvent.deviceRegionCode mapping"
+  - symbol: DeviceRegistryService
+    file: device-collector-service/.../service/DeviceRegistryService.java
+    change: "update any regionCode reference in device registration logic"
+
+  # alarm-engine-service
+  - symbol: AlarmRecordMapper
+    file: alarm-engine-service/.../mapper/AlarmRecordMapper.java
+    change: "update DeviceMetricEvent.deviceRegionCode -> AlarmRecord.alarmRegionCode mapping"
+  - symbol: AlarmEvaluationService
+    file: alarm-engine-service/.../service/AlarmEvaluationService.java
+    change: "update regionCode references in alarm creation"
+
+  # workorder-service
+  - symbol: AutoWorkOrderService
+    file: workorder-service/.../service/AutoWorkOrderService.java
+    change: "update AlarmEvent.deviceRegionCode -> WorkOrder.maintenanceRegionCode mapping"
+
+  # ops-gateway-service
+  - symbol: DashboardAggregationService
+    file: ops-gateway-service/.../service/DashboardAggregationService.java
+    change: "update WorkOrder.maintenanceRegionCode -> DeviceHealthSummary.regionCode"
+  - symbol: DashboardResponseMapper
+    file: ops-gateway-service/.../mapper/DashboardResponseMapper.java
+    change: "update regionCode field mapping in DTO conversion"
+
+  # JSON fixtures
+  - file: src/test/resources/fixtures/device-info/base-station-huawei.json
+    change: "update regionCode field name if fixture directly maps DeviceInfo"
+  - file: src/test/resources/fixtures/device-metric/cpu-critical.json
+    change: "update deviceRegionCode or regionCode field"
+  - file: src/test/resources/fixtures/alarm/alarm-critical-region-east.json
+    change: "update alarmRegionCode or regionCode field"
+  - file: src/test/resources/fixtures/workorder/auto-created-critical-alarm.json
+    change: "update maintenanceRegionCode or regionCode field"
+  - file: src/test/resources/fixtures/dashboard/device-health-summary.json
+    change: "update regionCode field"
+
+must_not_modify:
+  - symbol: Region.regionCode
+    reason: "区域实体主编码，与设备维护区域不同语义"
+    file: common-domain/.../region/Region.java
+  - symbol: OperatorUser.regionCode
+    reason: "人员所属区域，不是设备维护区域"
+    file: common-domain/.../user/OperatorUser.java
+  - symbol: RegionFilterRequest.regionCode
+    reason: "区域过滤请求参数，不是设备维护区域"
+    file: ops-gateway-service/.../dto/RegionFilterRequest.java
+  - symbol: NetworkSlice.regionCode
+    reason: "网络切片区域，与设备维护区域不同语义"
+    file: common-domain/.../device/NetworkSlice.java
+  - symbol: MaintenancePlan.regionCode
+    reason: "维护计划区域，不是设备维护区域"
+    file: common-domain/.../maintenance/MaintenancePlan.java
+  - symbol: ShiftSchedule.regionCode
+    reason: "排班区域，不是设备维护区域"
+    file: common-domain/.../user/ShiftSchedule.java
+  - symbol: TopologyNode.regionCode
+    reason: "拓扑节点区域，不是设备维护区域"
+    file: common-domain/.../topology/TopologyNode.java
+  - symbol: FederatedAlarmRecord.sourceRegionCode
+    reason: "联邦告警源区域，与设备维护区域不同语义"
+    file: alarm-federated-service/.../domain/FederatedAlarmRecord.java
+  - symbol: DispatchOrder.targetRegionCode
+    reason: "调度目标区域，与设备维护区域不同语义"
+    file: dispatch-service/.../domain/DispatchOrder.java
+  - symbol: VendorTicket.vendorRegionCode
+    reason: "厂商区域，与设备维护区域不同语义"
+    file: vendor-collaboration-service/.../domain/VendorTicket.java
+  - symbol: SlaContract.regionCode
+    reason: "SLA 合同区域，与设备维护区域不同语义"
+    file: sla-engine-service/.../domain/SlaContract.java
+
+verification:
+  - mvn test
+  - grep -r "DeviceInfo.regionCode" --include="*.java" # should be 0 hits after rename

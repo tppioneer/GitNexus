@@ -1,0 +1,55 @@
+case_id: telecom-case-w-notification-field-data-flow
+task_type: data_flow
+ground_truth_status: reviewed
+
+expected_entrypoints:
+  - symbol: WorkOrderEventPublisher.publish
+    file: workorder-service/src/main/java/com/example/telecom/workorder/event/WorkOrderEventPublisher.java
+    reason: Reads domain fields and constructs the cross-module event.
+
+expected_symbols:
+  - symbol: WorkOrderEvent
+    file: common-domain/src/main/java/com/example/telecom/common/workorder/WorkOrderEvent.java
+    reason: Carries workOrderId, fromStatus, toStatus, assignee, maintenanceRegionCode and timestamp.
+  - symbol: NotificationTemplateService.renderSubject
+    file: notification-service/src/main/java/com/example/telecom/notification/service/NotificationTemplateService.java
+    reason: Uses workOrderId and status pair in the subject.
+  - symbol: NotificationTemplateService.renderBody
+    file: notification-service/src/main/java/com/example/telecom/notification/service/NotificationTemplateService.java
+    reason: Uses all target event fields and applies the unassigned fallback.
+  - symbol: NotificationService.determineChannel
+    file: notification-service/src/main/java/com/example/telecom/notification/service/NotificationService.java
+    reason: Uses toStatus alone to derive channel.
+  - symbol: NotificationRequest
+    file: notification-service/src/main/java/com/example/telecom/notification/dto/NotificationRequest.java
+    reason: Carries workOrderId, channel, subject, body and fixed recipient to the channel.
+  - symbol: NotificationRecord
+    file: notification-service/src/main/java/com/example/telecom/notification/template/NotificationRecord.java
+    reason: Persists rendered values, recipient, channel and delivery success.
+
+expected_data_flow:
+  - field: workOrderId
+    route: "WorkOrder -> WorkOrderEvent -> subject/body + NotificationRequest -> NotificationRecord"
+  - field: fromStatus/toStatus
+    route: "transition context -> WorkOrderEvent -> subject/body; toStatus -> determineChannel"
+  - field: assignee
+    route: "WorkOrder -> WorkOrderEvent -> renderBody with unassigned fallback"
+  - field: maintenanceRegionCode
+    route: "WorkOrder -> WorkOrderEvent -> renderBody Region line"
+  - field: SendResult.success
+    route: "NotificationChannel.send -> NotificationRecord.success"
+
+must_mention:
+  - eventId is generated but is not copied into NotificationRequest or NotificationRecord.
+  - recipient is not propagated from the event; it is currently the fixed operator@telecom.local value.
+  - maintenanceRegionCode affects rendered body only, not channel choice.
+  - The repository can be queried later by workOrderId through NotificationController.
+
+must_exclude_from_impact:
+  - symbol: AlarmTemplateVariableResolver
+    reason: Separate generic template-variable mechanism, not used by this direct event renderer.
+
+recommended_validation:
+  - mvn -pl notification-service -am test -Dtest=NotificationTemplateServiceTest,NotificationServiceTest,NotificationMapperTest
+  - Assert exact subject/body, status-to-channel mapping, unassigned fallback and saved record fields.
+

@@ -1,0 +1,33 @@
+id: telecom-case-e-assignee-selector-impact
+name: Telecom AssigneeSelector.select 接口签名变更影响分析
+level: L2
+task_type: impact_analysis
+repo: telecom-ops-platform
+status: draft-ground-truth
+
+prompt: |
+  为了审计工单分配决策，需要给 AssigneeSelector.select 增加一个
+  AssignmentContext 参数，记录分配策略、候选集来源和最终选择依据。
+
+  请分析这个签名变更会影响哪些实现类、Registry 调度层、直接调用方和上游业务入口，
+  以及哪些测试需要同步更新。不要修改代码，只输出影响分析。
+
+graph_queries:
+  - 'context({name: "AssigneeSelector"})'
+  - 'impact({target: "select", direction: "upstream"})'
+
+grep_searches:
+  - rg "interface AssigneeSelector|implements AssigneeSelector|select\("
+  - rg "AssigneeSelectorRegistry|WorkOrderAssignmentService"
+
+
+ground_truth: docs/benchmark/v2/telecom/ground-truth/telecom-case-e-ground-truth.yaml
+
+risk_level: CRITICAL
+
+scoring:
+  must_identify:
+    - 3 个真实 AssigneeSelector 实现
+    - AssigneeSelectorRegistry.resolve 与 WorkOrderAssignmentService.assign
+    - WorkOrderFlowService、AutoWorkOrderService、批量派单和告警事件入口
+    - 直接 selector 测试以及 assignment/flow/bulk/auto-workorder 测试

@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitNexus Benchmark 报告</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#e6edf3;--text-muted:#8b949e;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--orange:#d29922;--graph:#58a6ff;--grep:#f0883e}*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;padding:20px}h1{font-size:1.8rem;margin-bottom:4px}h2{font-size:1.3rem;margin:24px 0 12px;color:var(--accent)}h3{font-size:1.1rem;margin:16px 0 8px}.subtitle{color:var(--text-muted);font-size:.9rem;margin-bottom:20px}.header{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:8px}.header-left h1{margin:0}.header-right{color:var(--text-muted);font-size:.85rem}.tabs{display:flex;gap:2px;margin-bottom:20px;border-bottom:1px solid var(--border)}.tab-btn{padding:8px 18px;cursor:pointer;border:none;background:0 0;color:var(--text-muted);font-size:.9rem;border-bottom:2px solid transparent;transition:all .15s}.tab-btn:hover{color:var(--text)}.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}.kpi-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px 16px}.kpi-card .label{font-size:.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px}.kpi-card .value{font-size:1.5rem;font-weight:600;margin-top:2px}.kpi-card .value.green{color:var(--green)}.kpi-card .value.orange{color:var(--orange)}.kpi-card .value.red{color:var(--red)}.kpi-card .value.blue{color:var(--accent)}.ov-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px 16px}.ov-card .ov-name{font-size:1.1rem;font-weight:600;color:var(--accent);margin-bottom:6px}.ov-card .ov-desc{font-size:.82rem;color:var(--text);margin-bottom:8px}.ov-card .ov-row{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.8rem;color:var(--text-muted)}.ov-card .ov-row span{white-space:nowrap}.ov-card .ov-row .ov-label{color:var(--text-muted)}.ov-card .ov-row .ov-val{color:var(--text)}.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}.chart-grid.single{grid-template-columns:1fr}.chart-box{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px}.chart-box h3{margin:0 0 8px;font-size:.95rem;color:var(--text)}.chart-box canvas{max-height:340px}.selector-bar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:16px;padding:12px 16px;background:var(--card);border:1px solid var(--border);border-radius:8px}.selector-bar label{font-size:.85rem;color:var(--text-muted)}.selector-bar select{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:.85rem}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:.82rem;background:var(--card);border:1px solid var(--border)}th,td{padding:7px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--border)}th{background:#1c2128;color:var(--text-muted);font-weight:600;cursor:pointer;position:sticky;top:0}th:hover{color:var(--text)}td:first-child,th:first-child{text-align:left}td.left{text-align:left}th.left{text-align:left}tr:hover{background:#1c2128}.badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:.75rem;font-weight:600}.badge-pass{background:#1b3d22;color:var(--green)}.badge-fail{background:#3d1b1b;color:var(--red)}.badge-graph{background:#1b2d3d;color:var(--graph)}.badge-grep{background:#3d2d1b;color:var(--grep)}.filter-input{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:.82rem;width:120px}@media(max-width:900px){.chart-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left"><h1>&#x1F4CA; GitNexus Benchmark 报告</h1><div class="subtitle">Graph vs Grep — 代码检索能力评测</div></div>
+  <div class="header-right" id="headerMeta"></div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="overview">&#x1F4C8; 总览</button>
+  <button class="tab-btn" data-tab="project">&#x1F4C1; 项目详情</button>
+  <button class="tab-btn" data-tab="model">&#x1F916; 模型对比</button>
+  <button class="tab-btn" data-tab="runs">&#x1F4CB; Run 明细</button>
+</div>
+
+<!-- Overview tab -->
+<div id="tab-overview" class="tab-content">
+  <div class="kpi-row" id="kpiRow"></div>
+  <h2 style="margin-top:28px">&#x1F4E6; 仓库概览</h2>
+  <div id="projectOverviewRow" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;margin-bottom:20px"></div>
+  <h2 style="margin-top:28px">&#x1F4DD; 评测总结</h2>
+  <div id="summarySection" style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:20px;font-size:.88rem;line-height:1.7"></div>
+  <div class="chart-grid">
+    <div class="chart-box"><h3>Graph Uplift（总分提升）</h3><canvas id="chartUplift"></canvas></div>
+    <div class="chart-box"><h3>通过率对比 Pass Rate</h3><canvas id="chartPassRate"></canvas></div>
+  </div>
+  <div class="chart-grid single">
+    <div class="chart-box"><h3>各维度平均分对比</h3><canvas id="chartDimCompare"></canvas></div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-box"><h3>工具调用次数</h3><canvas id="chartToolCalls"></canvas></div>
+    <div class="chart-box"><h3>搜索 vs 图谱查询次数</h3><canvas id="chartQueryCalls"></canvas></div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-box"><h3>读取文件数</h3><canvas id="chartFilesRead"></canvas></div>
+    <div class="chart-box"><h3>平均耗时 (ms)</h3><canvas id="chartElapsed"></canvas></div>
+  </div>
+</div>
+
+<!-- Project tab -->
+<div id="tab-project" class="tab-content" style="display:none">
+  <div class="selector-bar">
+    <label>项目：</label><select id="selProject"><option value="">-- 选择 --</option></select>
+    <label>模型：</label><select id="selModel"><option value="all">全部</option></select>
+  </div>
+  <div class="kpi-row" id="projectKpiRow"></div>
+  <div class="chart-grid">
+    <div class="chart-box"><h3>各维度得分雷达图</h3><canvas id="chartRadar"></canvas></div>
+    <div class="chart-box"><h3>各 Case 总分分布</h3><canvas id="chartCaseScores"></canvas></div>
+  </div>
+  <div class="chart-grid single">
+    <div class="chart-box"><h3>成本 vs 得分（气泡图）</h3><canvas id="chartBubble"></canvas></div>
+  </div>
+</div>
+
+<!-- Model tab -->
+<div id="tab-model" class="tab-content" style="display:none">
+  <div class="selector-bar">
+    <label>项目：</label><select id="selModelProject"><option value="all">全部</option></select>
+  </div>
+  <div class="chart-grid single">
+    <div class="chart-box"><h3>各模型 Uplift 对比</h3><canvas id="chartModelUplift"></canvas></div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-box"><h3>各模型 Graph 总分</h3><canvas id="chartModelGraphScore"></canvas></div>
+    <div class="chart-box"><h3>各模型 Grep 总分</h3><canvas id="chartModelGrepScore"></canvas></div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-box"><h3>工具调用次数</h3><canvas id="chartModelToolCalls"></canvas></div>
+    <div class="chart-box"><h3>平均耗时 (ms)</h3><canvas id="chartModelElapsed"></canvas></div>
+  </div>
+</div>
+
+<!-- Runs tab -->
+<div id="tab-runs" class="tab-content" style="display:none">
+  <div class="selector-bar">
+    <label>筛选：</label><input class="filter-input" id="filterProject" placeholder="项目" />
+    <input class="filter-input" id="filterModel" placeholder="模型" />
+    <input class="filter-input" id="filterAgent" placeholder="Agent" />
+    <input class="filter-input" id="filterPolicy" placeholder="Policy" />
+    <input class="filter-input" id="filterCase" placeholder="Case ID" />
+    <label style="margin-left:8px"><span id="runCountLabel">0</span> runs</label>
+  </div>
+  <div class="table-wrap">
+    <table id="runTable">
+      <thead><tr>
+        <th data-col="case_id">Case</th><th data-col="project" class="left">项目</th>
+        <th data-col="model" class="left">模型</th><th data-col="agent" class="left">Agent</th>
+        <th data-col="tool_policy" class="left">Policy</th><th data-col="status" class="left">状态</th>
+        <th data-col="total">有效分</th><th data-col="automatic_total">自动分</th><th data-col="adjudicated_total">人工分</th><th data-col="adjudication_delta">调整</th><th data-col="review_status">审核</th><th data-col="location_accuracy">定位</th>
+        <th data-col="coverage_completeness">覆盖</th><th data-col="evidence_quality">证据</th>
+        <th data-col="final_usability">可用性</th><th data-col="analysis_depth_bonus">分析深度</th>
+        <th data-col="tool_call_count">工具调用</th><th data-col="files_read_count">读文件</th>
+        <th data-col="search_query_count">搜索</th><th data-col="graph_query_count">图谱</th>
+        <th data-col="elapsed_ms">耗时(ms)</th><th data-col="violation_count">违规</th>
+      </tr></thead>
+      <tbody id="runTableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+// DATA will be injected by the generator script
+var DATA = __DATA_JSON__;
+
+var COLORS_LIST = ["#58a6ff","#f0883e","#3fb950","#d29922","#bc8cff","#f85149","#79c0ff","#ffd700"];
+
+function fmt(n, d) {
+  d = d || 1;
+  return typeof n === "number" ? n.toFixed(d) : n;
+}
+
+// ── KPI Cards ──
+function buildKpiCards() {
+  var tr = DATA.rows.length;
+  var vr = DATA.rows.filter(function(r) { return r.status !== "invalid"; }).length;
+  var ir = tr - vr;
+  var al = DATA.uplifts.map(function(u) { return u.uplift_abs; });
+  var avgU = al.length ? al.reduce(function(a, b) { return a + b; }, 0) / al.length : 0;
+  var maxU = al.length ? Math.max.apply(null, al) : 0;
+  var pj = DATA.projects.length;
+  var md = DATA.projects.reduce(function(s, p) { return s + p.models.length; }, 0);
+
+  document.getElementById("kpiRow").innerHTML = [
+    { label: "总 Run 数", value: tr, cls: "blue" },
+    { label: "有效 Run", value: vr, cls: "green" },
+    { label: "无效 Run", value: ir, cls: ir > 0 ? "red" : "" },
+    { label: "平均 Uplift", value: avgU.toFixed(2), cls: avgU > 0 ? "green" : "orange" },
+    { label: "最大 Uplift", value: maxU.toFixed(2), cls: "green" },
+    { label: "项目数", value: pj, cls: "blue" },
+    { label: "模型数", value: md, cls: "blue" }
+  ].map(function(c) {
+    return '<div class="kpi-card"><div class="label">' + c.label + '</div><div class="value ' + c.cls + '">' + c.value + '</div></div>';
+  }).join("");
+
+  document.getElementById("headerMeta").textContent = pj + " 项目 · " + md + " 模型 · 生成于 " + new Date().toISOString().slice(0, 10);
+  document.getElementById("runCountLabel").textContent = DATA.rows.length;
+}
+
+// ── Project Overview Cards ──
+function renderProjectOverviews() {
+  var overviews = DATA.projectOverviews || {};
+  var projects = {};
+  DATA.rows.forEach(function(r) {
+    if (!projects[r._project]) projects[r._project] = true;
+  });
+  var html = "";
+  Object.keys(overviews).forEach(function(key) {
+    var ov = overviews[key];
+    if (!ov) return;
+    // Only show if this project has report data (key matches _project)
+    if (!projects[key]) return;
+    html += '<div class="ov-card">'
+      + '<div class="ov-name">' + (ov.name || key) + '</div>'
+      + '<div class="ov-name">' + (ov.name || projectKey) + '</div>'
+      + '<div class="ov-desc">' + (ov.description || "") + '</div>'
+      + '<div class="ov-row">';
+    if (ov.language) html += '<span><span class="ov-label">语言：</span><span class="ov-val">' + ov.language + '</span></span>';
+    if (ov.framework) html += '<span><span class="ov-label">框架：</span><span class="ov-val">' + ov.framework + '</span></span>';
+    if (ov.lines_of_code) html += '<span><span class="ov-label">代码量：</span><span class="ov-val">' + ov.lines_of_code + '</span></span>';
+    if (ov.modules) html += '<span><span class="ov-label">模块数：</span><span class="ov-val">' + ov.modules + '</span></span>';
+    html += '</div></div>';
+  });
+  document.getElementById("projectOverviewRow").innerHTML = html;
+}
+
+// ── Agent-generated report analysis ──
+function escapeHtml(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function renderTextList(title, values) {
+  if (!values || values.length === 0) return "";
+  return "<h3 style='color:var(--accent);margin:16px 0 6px'>" + escapeHtml(title) + "</h3><ul>"
+    + values.map(function(value) { return "<li>" + escapeHtml(value) + "</li>"; }).join("")
+    + "</ul>";
+}
+
+function renderSummary() {
+  var handoff = DATA.reportAnalysis || { status: "missing" };
+  var section = document.getElementById("summarySection");
+  if (handoff.status !== "ready" || !handoff.result) {
+    section.innerHTML = "<p style='color:var(--orange)'><strong>分析状态：</strong>"
+      + escapeHtml(handoff.status || "missing") + "</p><p>"
+      + escapeHtml(handoff.message || "后处理分析尚未生成。") + "</p>";
+    return;
+  }
+
+  var analysis = handoff.result;
+  var html = analysis.executive_summary.map(function(paragraph) {
+    return "<p style='margin-bottom:10px'>" + escapeHtml(paragraph) + "</p>";
+  }).join("");
+
+  if (analysis.key_findings.length) {
+    html += "<h3 style='color:var(--accent);margin:16px 0 6px'>关键发现</h3>";
+    analysis.key_findings.forEach(function(finding) {
+      html += "<div style='margin:8px 0'><strong>" + escapeHtml(finding.title) + "</strong> "
+        + "<span class='badge badge-" + (finding.direction === "graph" ? "graph" : finding.direction === "grep" ? "grep" : "pass") + "'>"
+        + escapeHtml(finding.direction) + " / " + escapeHtml(finding.confidence) + "</span><br>"
+        + escapeHtml(finding.analysis) + "<br><span style='color:var(--text-muted)'>证据："
+        + finding.evidence_refs.map(escapeHtml).join("；") + "</span></div>";
+    });
+  }
+
+  if (analysis.case_comparisons.length) {
+    html += "<h3 style='color:var(--accent);margin:16px 0 6px'>关键配对比较</h3><ul>";
+    analysis.case_comparisons.forEach(function(item) {
+      html += "<li><strong>" + escapeHtml(item.scope) + "</strong>：Graph " + Number(item.graph_avg).toFixed(2)
+        + " / Grep " + Number(item.grep_avg).toFixed(2) + " / Uplift " + Number(item.uplift).toFixed(2)
+        + "。" + escapeHtml(item.analysis) + "</li>";
+    });
+    html += "</ul>";
+  }
+
+  if (analysis.scoring_quality.length) {
+    html += "<h3 style='color:var(--accent);margin:16px 0 6px'>评分可信度</h3><ul>";
+    analysis.scoring_quality.forEach(function(issue) {
+      html += "<li><strong>[" + escapeHtml(issue.severity) + "]</strong> " + escapeHtml(issue.analysis)
+        + (issue.evidence_refs.length ? " <span style='color:var(--text-muted)'>（" + issue.evidence_refs.map(escapeHtml).join("；") + "）</span>" : "")
+        + "</li>";
+    });
+    html += "</ul>";
+  }
+
+  html += renderTextList("质量与成本权衡", analysis.cost_quality_tradeoffs);
+  html += renderTextList("建议", analysis.recommendations);
+  html += renderTextList("限制", analysis.limitations);
+  section.innerHTML = html;
+}
+
+// ── Chart: Uplift ──
+function chartUplift() {
+  var labels = DATA.uplifts.map(function(u) { return u.project + "\n" + u.model + "\n" + u.agent; });
+  var vals = DATA.uplifts.map(function(u) { return u.uplift_abs; });
+  new Chart(document.getElementById("chartUplift"), {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [{
+        label: "Uplift",
+        data: vals,
+        backgroundColor: vals.map(function(v) { return v > 0 ? "#3fb950" : v < 0 ? "#f85149" : "#8b949e"; }),
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: "#30363d" }, ticks: { color: "#8b949e" } },
+        x: { grid: { display: false }, ticks: { color: "#8b949e" } }
+      }
+    }
+  });
+}
+
+// ── Chart: Pass Rate ──
+function chartPassRate() {
+  var pjs = DATA.projects.map(function(p) { return p.name; });
+  new Chart(document.getElementById("chartPassRate"), {
+    type: "bar",
+    data: {
+      labels: pjs,
+      datasets: [
+        {
+          label: "Graph",
+          data: pjs.map(function(p) {
+            var g = DATA.groups.find(function(x) { return x.project === p && x.tool_policy === "graph"; });
+            return g ? g.pass_rate * 100 : 0;
+          }),
+          backgroundColor: "#58a6ff", borderRadius: 4
+        },
+        {
+          label: "Grep",
+          data: pjs.map(function(p) {
+            var g = DATA.groups.find(function(x) { return x.project === p && x.tool_policy === "grep"; });
+            return g ? g.pass_rate * 100 : 0;
+          }),
+          backgroundColor: "#f0883e", borderRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { labels: { color: "#8b949e" } } },
+      scales: {
+        y: { max: 100, grid: { color: "#30363d" }, ticks: { color: "#8b949e", callback: function(v) { return v + "%"; } } },
+        x: { grid: { display: false }, ticks: { color: "#8b949e" } }
+      }
+    }
+  });
+}
+
+// ── Chart: Dimension Compare ──
+function chartDimCompare() {
+  var dims = ["location_accuracy", "coverage_completeness", "evidence_quality", "final_usability"];
+  var dl = ["定位准确性", "覆盖完整性", "证据质量", "最终可用性"];
+  var ga = dims.map(function(d) {
+    var rows = DATA.rows.filter(function(r) { return r.tool_policy === "graph" && r[d] != null; });
+    return rows.length ? rows.reduce(function(s, r) { return s + r[d]; }, 0) / rows.length : 0;
+  });
+  var pa = dims.map(function(d) {
+    var rows = DATA.rows.filter(function(r) { return r.tool_policy === "grep" && r[d] != null; });
+    return rows.length ? rows.reduce(function(s, r) { return s + r[d]; }, 0) / rows.length : 0;
+  });
+  new Chart(document.getElementById("chartDimCompare"), {
+    type: "bar",
+    data: {
+      labels: dl,
+      datasets: [
+        { label: "Graph", data: ga, backgroundColor: "#58a6ff", borderRadius: 4 },
+        { label: "Grep", data: pa, backgroundColor: "#f0883e", borderRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { labels: { color: "#8b949e" } } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: "#30363d" }, ticks: { color: "#8b949e" } },
+        x: { grid: { display: false }, ticks: { color: "#8b949e" } }
+      }
+    }
+  });
+}
+
+// ── Chart: Tool Calls ──
+function chartToolCalls() {
+  var pjs = DATA.projects.map(function(p) { return p.name; });
+  new Chart(document.getElementById("chartToolCalls"), {
+    type: "bar",
+    data: {
+      labels: pjs,
+      datasets: [
+        {
+          label: "Graph",
+          data: pjs.map(function(p) {
+            var g = DATA.groups.find(function(x) { return x.project === p && x.tool_policy === "graph"; });
+            return g ? g.avg_tool_call_count : 0;
+          }),
+          backgroundColor: "#58a6ff", borderRadius: 4
+        },
+        {
+          label: "Grep",
+          data: pjs.map(function(p) {
+            var g = DATA.groups.find(function(x) { return x.project === p && x.tool_policy === "grep"; });
+            return g ? g.avg_tool_call_count : 0;
+          }),
+          backgroundColor: "#f0883e", borderRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { labels: { color: "#8b949e" } } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: "#30363d" }, ticks: { color: "#8b949e" } },
+        x: { grid: { display: false }, ticks: { color: "#8b949e" } }
+      }
+    }
+  });
+}
+
+// ── Chart: Query Calls ──
+function chartQueryCalls() {
+  var pjs = DATA.projects.map(function(p) { return p.name; });
+  new Chart(document.getElementById("chartQueryCalls"), {
+    type: "bar",
+    data: {
+      labels: pjs,
+      datasets: [
+        {
+          label: "Graph - 图谱查询",
+          data: pjs.map(function(p) {
+            var g = DATA.groups.find(function(x) { return x.project === p && x.tool_policy === "graph"; });
+            return g ? g.avg_graph_query_count : 0;
+          }),
+          backgroundColor: "#58a6ff", borderRadius: 4
+        },
+        {
+          label: "Graph - 搜索",
+          data: pjs.map(function(p) {
+            var g = DATA.groups.find(function(x) { return x.project === p && x.tool_policy === "graph"; });
+            return g ? g.avg_search_query_count : 0;
+          }),
+          backgroundColor: "#79c0ff", borderRadius: 4
+        },
+        {
+          label: "Grep - 搜索",
+          data: pjs.map(function(p) {
+            var g = DATA.groups.find(function(x) { return x.project === p && x.tool_policy === "grep"; });
+            return g ? g.avg_search_query_count : 0;
+          }),
+          backgroundColor: "#f0883e", borderRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { labels: { color: "#8b949e" } } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: "#30363d" }, ticks: { color: "#8b949e" } },
+        x: { grid: { display: false }, ticks: { color: "#8b949e" } }
+      }
+    }
+  });
+}
+
+// ── Chart: Files Read ──
+function chartFilesRead() {
+  var pjs = DATA.projects.map(function(p) { return p.name; });
+  new Chart(document.getElementById("chartFilesRead"), {
+    type: "bar",
+    data: {
+      labels: pjs,
+      datasets: [
+        {
+          label: "Graph",
+          data: pjs.map(function(p) {
+            var g = DATA.groups.find(function(x) { return x.project === p && x.tool_policy === "graph"; });
+            return g ? g.avg_files_read_count : 0;
+          }),
+          backgroundColor: "#58a6ff", borderRadius: 4
+        },
+        {
+          label: "Grep",
+          data: pjs.map(function(p) {
+            var g = DATA.groups.find(function(x) { return x.project === p && x.tool_policy === "grep"; });
+            return g ? g.avg_files_read_count : 0;
+          }),
+          backgroundColor: "#f0883e", borderRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { labels: { color: "#8b949e" } } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: "#30363d" }, ticks: { color: "#8b949e" } },
+        x: { grid: { display: false }, ticks: { color: "#8b949e" } }
+      }
+    }
+  });
+}
+
+// ── Chart: Elapsed ──
+function chartElapsed() {
+  var pjs = DATA.projects.map(function(p) { return p.name; });
+  new Chart(document.getElementById("chartElapsed"), {
+    type: "bar",
+    data: {
+      labels: pjs,
+      datasets: [
+        {
+          label: "Graph",
+          data: pjs.map(function(p) {
+            var g = DATA.groups.find(function(x) { return x.project === p && x.tool_policy === "graph"; });
+            return g ? g.avg_elapsed_ms : 0;
+          }),
+          backgroundColor: "#58a6ff", borderRadius: 4
+        },
+        {
+          label: "Grep",
+          data: pjs.map(function(p) {
+            var g = DATA.groups.find(function(x) { return x.project === p && x.tool_policy === "grep"; });
+            return g ? g.avg_elapsed_ms : 0;
+          }),
+          backgroundColor: "#f0883e", borderRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { labels: { color: "#8b949e" } } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: "#30363d" }, ticks: { color: "#8b949e" } },
+        x: { grid: { display: false }, ticks: { color: "#8b949e" } }
+      }
+    }
+  });
+}
+
+// ── Project Detail ──
+function populateProjectSelect() {
+  var sel = document.getElementById("selProject");
+  DATA.projects.forEach(function(p) {
+    var o = document.createElement("option");
+    o.value = p.name;
+    o.textContent = p.name;
+    sel.appendChild(o);
+  });
+  if (DATA.projects.length) sel.value = DATA.projects[0].name;
+}
+
+function populateModelSelect(project) {
+  var sel = document.getElementById("selModel");
+  sel.innerHTML = '<option value="all">全部</option>';
+  if (!project) return;
+  var p = DATA.projects.find(function(x) { return x.name === project; });
+  if (!p) return;
+  p.models.forEach(function(m) {
+    var o = document.createElement("option");
+    o.value = m;
+    o.textContent = m;
+    sel.appendChild(o);
+  });
+}
+
+var _radarChart, _caseChart, _bubbleChart;
+
+function updateProjectView() {
+  var project = document.getElementById("selProject").value;
+  var mf = document.getElementById("selModel").value;
+  populateModelSelect(project);
+
+  // Restore model selection if still in list
+  var modelOpt = document.getElementById("selModel").querySelector('option[value="' + mf + '"]');
+  if (modelOpt) document.getElementById("selModel").value = mf;
+
+  if (!project) return;
+
+  var rows = DATA.rows.filter(function(r) {
+    return r._project === project && (mf === "all" || r._model === mf);
+  });
+  var gr = rows.filter(function(r) { return r.tool_policy === "graph"; });
+  var pr = rows.filter(function(r) { return r.tool_policy === "grep"; });
+
+  var gAvg = gr.length ? gr.reduce(function(s, r) { return s + r.total; }, 0) / gr.length : 0;
+  var pAvg = pr.length ? pr.reduce(function(s, r) { return s + r.total; }, 0) / pr.length : 0;
+  var upl = gAvg - pAvg;
+
+  document.getElementById("projectKpiRow").innerHTML = [
+    { label: "Graph 平均分", value: fmt(gAvg), cls: "blue" },
+    { label: "Grep 平均分", value: fmt(pAvg), cls: "orange" },
+    { label: "Uplift", value: fmt(upl), cls: upl > 0 ? "green" : "red" },
+    { label: "Graph Run 数", value: gr.length, cls: "blue" },
+    { label: "Grep Run 数", value: pr.length, cls: "" },
+    { label: "有效 Run", value: rows.filter(function(r) { return r.status !== "invalid"; }).length, cls: "green" }
+  ].map(function(c) {
+    return '<div class="kpi-card"><div class="label">' + c.label + '</div><div class="value ' + c.cls + '">' + c.value + '</div></div>';
+  }).join("");
+
+  // Radar chart
+  var dims = ["location_accuracy", "coverage_completeness", "evidence_quality", "final_usability", "analysis_depth_bonus"];
+  var dl2 = ["定位", "覆盖", "证据", "可用性", "分析深度"];
+  var gd = dims.map(function(d) {
+    return gr.length ? gr.reduce(function(s, r) { return s + (r[d] || 0); }, 0) / gr.length : 0;
+  });
+  var pd = dims.map(function(d) {
+    return pr.length ? pr.reduce(function(s, r) { return s + (r[d] || 0); }, 0) / pr.length : 0;
+  });
+
+  if (_radarChart) _radarChart.destroy();
+  _radarChart = new Chart(document.getElementById("chartRadar"), {
+    type: "radar",
+    data: {
+      labels: dl2,
+      datasets: [
+        { label: "Graph", data: gd, borderColor: "#58a6ff", backgroundColor: "rgba(88,166,255,0.1)", pointBackgroundColor: "#58a6ff" },
+        { label: "Grep", data: pd, borderColor: "#f0883e", backgroundColor: "rgba(240,136,62,0.1)", pointBackgroundColor: "#f0883e" }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { labels: { color: "#8b949e" } } },
+      scales: {
+        r: {
+          beginAtZero: true,
+          grid: { color: "#30363d" },
+          angleLines: { color: "#30363d" },
+          pointLabels: { color: "#8b949e" },
+          ticks: { color: "#8b949e", backdropColor: "transparent" }
+        }
+      }
+    }
+  });
+
+  // Case scores
+  var cids = [];
+  rows.forEach(function(r) { if (cids.indexOf(r.case_id) < 0) cids.push(r.case_id); });
+
+  if (_caseChart) _caseChart.destroy();
+  _caseChart = new Chart(document.getElementById("chartCaseScores"), {
+    type: "bar",
+    data: {
+      labels: cids,
+      datasets: [
+        {
+          label: "Graph",
+          data: cids.map(function(c) {
+            var g = gr.filter(function(r) { return r.case_id === c; });
+            return g.length ? g.reduce(function(s, r) { return s + r.total; }, 0) / g.length : 0;
+          }),
+          backgroundColor: "#58a6ff", borderRadius: 4
+        },
+        {
+          label: "Grep",
+          data: cids.map(function(c) {
+            var g = pr.filter(function(r) { return r.case_id === c; });
+            return g.length ? g.reduce(function(s, r) { return s + r.total; }, 0) / g.length : 0;
+          }),
+          backgroundColor: "#f0883e", borderRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { labels: { color: "#8b949e" } } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: "#30363d" }, ticks: { color: "#8b949e" } },
+        x: { grid: { display: false }, ticks: { color: "#8b949e" } }
+      }
+    }
+  });
+
+  // Bubble chart
+  if (_bubbleChart) _bubbleChart.destroy();
+  _bubbleChart = new Chart(document.getElementById("chartBubble"), {
+    type: "bubble",
+    data: {
+      datasets: [
+        {
+          label: "Graph",
+          data: rows.filter(function(r) { return r.tool_policy === "graph" && r.tool_call_count > 0 && r.elapsed_ms > 0; })
+            .map(function(r) {
+              return {
+                x: r.search_query_count + r.graph_query_count,
+                y: r.total,
+                r: Math.max(4, Math.min(20, r.tool_call_count / 3))
+              };
+            }),
+          backgroundColor: "rgba(88,166,255,0.6)"
+        },
+        {
+          label: "Grep",
+          data: rows.filter(function(r) { return r.tool_policy === "grep" && r.tool_call_count > 0 && r.elapsed_ms > 0; })
+            .map(function(r) {
+              return {
+                x: r.search_query_count + r.graph_query_count,
+                y: r.total,
+                r: Math.max(4, Math.min(20, r.tool_call_count / 3))
+              };
+            }),
+          backgroundColor: "rgba(240,136,62,0.6)"
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { labels: { color: "#8b949e" } } },
+      scales: {
+        x: { title: { display: true, text: "查询次数(搜索+图谱)", color: "#8b949e" }, grid: { color: "#30363d" }, ticks: { color: "#8b949e" } },
+        y: { title: { display: true, text: "总分", color: "#8b949e" }, beginAtZero: true, grid: { color: "#30363d" }, ticks: { color: "#8b949e" } }
+      }
+    }
+  });
+}
+
+// ── Model Compare ──
+function populateModelProjectSelect() {
+  var sel = document.getElementById("selModelProject");
+  DATA.projects.forEach(function(p) {
+    var o = document.createElement("option");
+    o.value = p.name;
+    o.textContent = p.name;
+    sel.appendChild(o);
+  });
+}
+
+var _modelUpliftChart, _modelGraphScoreChart, _modelGrepScoreChart, _modelToolChart, _modelElapsedChart;
+
+function updateModelView() {
+  var pf = document.getElementById("selModelProject").value;
+  var u = pf === "all" ? DATA.uplifts : DATA.uplifts.filter(function(x) { return x.project === pf; });
+  // Deduplicate by (project + model): if same model appears in multiple projects, prefix with project name
+  var seen = {};
+  var labels = u.map(function(x) {
+    var key = x.project + "::" + x.model;
+    if (pf === "all" && DATA.projects.length > 1) {
+      seen[key] = true;
+      return x.project + " / " + x.model;
+    }
+    seen[key] = true;
+    return x.model;
+  });
+  var vals = u.map(function(x) { return x.uplift_abs; });
+
+  if (_modelUpliftChart) _modelUpliftChart.destroy();
+  _modelUpliftChart = new Chart(document.getElementById("chartModelUplift"), {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [{
+        label: "Uplift",
+        data: vals,
+        backgroundColor: vals.map(function(v) { return v > 0 ? "#3fb950" : "#f85149"; }),
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: "#30363d" }, ticks: { color: "#8b949e" } },
+        x: { grid: { display: false }, ticks: { color: "#8b949e" } }
+      }
+    }
+  });
+
+  var gs = pf === "all" ? DATA.groups : DATA.groups.filter(function(x) { return x.project === pf; });
+  // Use (project::model) as unique key when showing all projects
+  var usePrefix = pf === "all" && DATA.projects.length > 1;
+  var ms = [], msKeys = {};
+  gs.forEach(function(g) {
+    var key = usePrefix ? g.project + "::" + g.model : g.model;
+    if (!msKeys[key]) { msKeys[key] = true; ms.push(key); }
+  });
+  function labelOf(key) { return usePrefix ? key.replace("::", " / ") : key; }
+  function findGroup(modelKey, policy) {
+    if (!usePrefix) return gs.find(function(x) { return x.model === modelKey && x.tool_policy === policy; });
+    var parts = modelKey.split("::");
+    return gs.find(function(x) { return x.project === parts[0] && x.model === parts[1] && x.tool_policy === policy; });
+  }
+
+  if (_modelGraphScoreChart) _modelGraphScoreChart.destroy();
+  _modelGraphScoreChart = new Chart(document.getElementById("chartModelGraphScore"), {
+    type: "bar",
+    data: {
+      labels: ms.map(labelOf),
+      datasets: [{
+        label: "Graph 总分",
+        data: ms.map(function(m) { var g = findGroup(m, "graph"); return g ? g.avg_total : 0; }),
+        backgroundColor: "#58a6ff", borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: "#30363d" }, ticks: { color: "#8b949e" } },
+        x: { grid: { display: false }, ticks: { color: "#8b949e" } }
+      }
+    }
+  });
+
+  if (_modelGrepScoreChart) _modelGrepScoreChart.destroy();
+  _modelGrepScoreChart = new Chart(document.getElementById("chartModelGrepScore"), {
+    type: "bar",
+    data: {
+      labels: ms.map(labelOf),
+      datasets: [{
+        label: "Grep 总分",
+        data: ms.map(function(m) { var g = findGroup(m, "grep"); return g ? g.avg_total : 0; }),
+        backgroundColor: "#f0883e", borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: "#30363d" }, ticks: { color: "#8b949e" } },
+        x: { grid: { display: false }, ticks: { color: "#8b949e" } }
+      }
+    }
+  });
+
+  if (_modelToolChart) _modelToolChart.destroy();
+  _modelToolChart = new Chart(document.getElementById("chartModelToolCalls"), {
+    type: "bar",
+    data: {
+      labels: ms.map(labelOf),
+      datasets: [
+        {
+          label: "Graph",
+          data: ms.map(function(m) { var g = findGroup(m, "graph"); return g ? g.avg_tool_call_count : 0; }),
+          backgroundColor: "#58a6ff", borderRadius: 4
+        },
+        {
+          label: "Grep",
+          data: ms.map(function(m) { var g = findGroup(m, "grep"); return g ? g.avg_tool_call_count : 0; }),
+          backgroundColor: "#f0883e", borderRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { labels: { color: "#8b949e" } } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: "#30363d" }, ticks: { color: "#8b949e" } },
+        x: { grid: { display: false }, ticks: { color: "#8b949e" } }
+      }
+    }
+  });
+
+  if (_modelElapsedChart) _modelElapsedChart.destroy();
+  _modelElapsedChart = new Chart(document.getElementById("chartModelElapsed"), {
+    type: "bar",
+    data: {
+      labels: ms.map(labelOf),
+      datasets: [
+        {
+          label: "Graph",
+          data: ms.map(function(m) { var g = findGroup(m, "graph"); return g ? g.avg_elapsed_ms : 0; }),
+          backgroundColor: "#58a6ff", borderRadius: 4
+        },
+        {
+          label: "Grep",
+          data: ms.map(function(m) { var g = findGroup(m, "grep"); return g ? g.avg_elapsed_ms : 0; }),
+          backgroundColor: "#f0883e", borderRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { labels: { color: "#8b949e" } } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: "#30363d" }, ticks: { color: "#8b949e" } },
+        x: { grid: { display: false }, ticks: { color: "#8b949e" } }
+      }
+    }
+  });
+}
+
+// ── Run Detail Table ──
+var _sortCol = "total", _sortDir = -1;
+
+function renderRunTable() {
+  var fp = document.getElementById("filterProject").value.toLowerCase();
+  var fm = document.getElementById("filterModel").value.toLowerCase();
+  var fa = document.getElementById("filterAgent").value.toLowerCase();
+  var fpo = document.getElementById("filterPolicy").value.toLowerCase();
+  var fc = document.getElementById("filterCase").value.toLowerCase();
+
+  var rows = DATA.rows.filter(function(r) {
+    if (fp && !(r._project || "").toLowerCase().includes(fp)) return false;
+    if (fm && !(r._model || "").toLowerCase().includes(fm)) return false;
+    if (fa && !(r.agent || "").toLowerCase().includes(fa)) return false;
+    if (fpo && !(r.tool_policy || "").toLowerCase().includes(fpo)) return false;
+    if (fc && !(r.case_id || "").toLowerCase().includes(fc)) return false;
+    return true;
+  });
+
+  rows.sort(function(a, b) {
+    var va = a[_sortCol] || 0, vb = b[_sortCol] || 0;
+    if (typeof va === "string") va = va.toLowerCase();
+    if (typeof vb === "string") vb = vb.toLowerCase();
+    return va < vb ? -1 * _sortDir : va > vb ? 1 * _sortDir : 0;
+  });
+
+  document.getElementById("runCountLabel").textContent = rows.length;
+  document.getElementById("runTableBody").innerHTML = rows.map(function(r) {
+    var statusBadge = r.status === "passed"
+      ? '<span class="badge badge-pass">pass</span>'
+      : r.status === "failed"
+        ? '<span class="badge badge-fail">fail</span>'
+        : r.status;
+    var policyBadge = r.tool_policy === "graph"
+      ? '<span class="badge badge-graph">graph</span>'
+      : '<span class="badge badge-grep">grep</span>';
+    return "<tr>"
+      + '<td class="left">' + (r.case_id || "") + "</td>"
+      + '<td class="left">' + (r._project || "") + "</td>"
+      + '<td class="left">' + (r._model || "") + "</td>"
+      + '<td class="left">' + (r.agent || "") + "</td>"
+      + '<td class="left">' + policyBadge + "</td>"
+      + '<td class="left">' + statusBadge + "</td>"
+      + "<td>" + fmt(r.total) + "</td>"
+      + "<td>" + fmt(r.automatic_total == null ? r.total : r.automatic_total) + "</td>"
+      + "<td>" + (r.adjudicated_total == null ? "—" : fmt(r.adjudicated_total)) + "</td>"
+      + "<td>" + fmt(r.adjudication_delta || 0) + "</td>"
+      + '<td class="left">' + (r.review_status || "not_reviewed") + (r.review_outcome ? "/" + r.review_outcome : "") + "</td>"
+      + "<td>" + fmt(r.location_accuracy) + "</td>"
+      + "<td>" + fmt(r.coverage_completeness) + "</td>"
+      + "<td>" + fmt(r.evidence_quality) + "</td>"
+      + "<td>" + fmt(r.final_usability) + "</td>"
+      + "<td>" + fmt(r.analysis_depth_bonus) + "</td>"
+      + "<td>" + (r.tool_call_count || 0) + "</td>"
+      + "<td>" + (r.files_read_count || 0) + "</td>"
+      + "<td>" + (r.search_query_count || 0) + "</td>"
+      + "<td>" + (r.graph_query_count || 0) + "</td>"
+      + "<td>" + (r.elapsed_ms || 0) + "</td>"
+      + "<td>" + (r.violation_count || 0) + "</td>"
+      + "</tr>";
+  }).join("");
+}
+
+// ── Tab switching ──
+document.querySelectorAll(".tab-btn").forEach(function(btn) {
+  btn.addEventListener("click", function() {
+    document.querySelectorAll(".tab-btn").forEach(function(b) { b.classList.remove("active"); });
+    btn.classList.add("active");
+    document.querySelectorAll(".tab-content").forEach(function(tc) { tc.style.display = "none"; });
+    document.getElementById("tab-" + btn.dataset.tab).style.display = "block";
+    setTimeout(function() { window.dispatchEvent(new Event("resize")); }, 100);
+  });
+});
+
+// ── Table sort ──
+document.querySelectorAll("#runTable th[data-col]").forEach(function(th) {
+  th.addEventListener("click", function() {
+    var col = th.dataset.col;
+    if (_sortCol === col) _sortDir *= -1;
+    else { _sortCol = col; _sortDir = -1; }
+    renderRunTable();
+  });
+});
+
+// ── Filter change ──
+["filterProject", "filterModel", "filterAgent", "filterPolicy", "filterCase"].forEach(function(id) {
+  document.getElementById(id).addEventListener("input", renderRunTable);
+});
+
+// ── Select change ──
+document.getElementById("selProject").addEventListener("change", updateProjectView);
+document.getElementById("selModel").addEventListener("change", updateProjectView);
+document.getElementById("selModelProject").addEventListener("change", updateModelView);
+
+// ── Init ──
+buildKpiCards();renderProjectOverviews();renderSummary();
+chartUplift();
+chartPassRate();
+chartDimCompare();
+chartToolCalls();
+chartQueryCalls();
+chartFilesRead();
+chartElapsed();
+populateProjectSelect();
+populateModelProjectSelect();
+updateProjectView();
+updateModelView();
+renderRunTable();
+</script>
+</body>
+</html>

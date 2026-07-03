@@ -1,0 +1,17 @@
+id: telecom-large-case-w-device-lifecycle-data-flow
+name: Telecom Large device lifecycle state data flow
+level: L2
+task_type: data_flow
+repo: telecom-ops-platform-large
+status: reviewed
+
+prompt: |
+  请追踪设备注册请求中的设备标识、区域和网络信息如何进入生命周期记录，并在后续激活或挂起时如何形成 previous/current state、审计记录、事件和 API 响应。
+  需要说明哪些字段会进入状态变更事件，哪些只保存在领域记录中，以及非法转换在哪个边界被阻止。
+  不要修改代码，只输出有证据支持的数据流、状态边界和验证建议。
+
+extra_desc: |
+  人工审阅提示，不进入公开载荷：核对 Request、Validator、Service、LifecycleRecord、DeviceStateMachine、Repository、Audit、EventPublisher、Mapper/Response。
+
+ground_truth: docs/benchmark/v2/telecom/large/ground-truth/telecom-large-case-w-ground-truth.yaml
+

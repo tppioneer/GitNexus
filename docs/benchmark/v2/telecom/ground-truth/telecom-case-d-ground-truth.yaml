@@ -1,0 +1,59 @@
+case_id: telecom-case-d-notification-send-impact
+task_type: impact_analysis
+
+target:
+  symbol: NotificationChannel.send
+  file: notification-service/src/main/java/com/example/telecom/notification/channel/NotificationChannel.java
+  current_signature: "SendResult send(NotificationRequest request)"
+  proposed_signature: "SendResult send(NotificationRequest request, DeliveryContext context)"
+  graph_risk: MEDIUM
+  graph_blast_radius:
+    direct_callers: 5
+    total_impacted_with_depth_3: 14
+    affected_process_groups: 2
+
+expected_symbols:
+  - symbol: SmsNotificationChannel.send
+    file: notification-service/.../channel/SmsNotificationChannel.java
+    reason: Primary SMS implementation of NotificationChannel.send.
+  - symbol: EmailNotificationChannel.send
+    file: notification-service/.../channel/EmailNotificationChannel.java
+    reason: Email implementation of NotificationChannel.send.
+  - symbol: WeComNotificationChannel.send
+    file: notification-service/.../channel/WeComNotificationChannel.java
+    reason: WeChat Work implementation of NotificationChannel.send.
+  - symbol: NotificationService.process
+    file: notification-service/.../service/NotificationService.java
+    reason: Resolves channel by status-derived type, sends once, then persists NotificationRecord.
+  - symbol: NotificationRetryService.retry
+    file: notification-service/.../service/NotificationRetryService.java
+    reason: Rebuilds NotificationRequest from failed record and resends through resolved interface.
+  - symbol: NotificationChannelRegistry.resolve
+    file: notification-service/.../channel/NotificationChannelRegistry.java
+    reason: Returns NotificationChannel by class-name-derived channel key.
+
+indirect_entrypoints:
+  - symbol: WorkOrderEventConsumer.onWorkOrderChanged
+    chain: "WorkOrderEventPublisher.publish -> WorkOrderEventConsumer.onWorkOrderChanged -> NotificationService.process -> NotificationChannel.send"
+    file: notification-service/.../consumer/WorkOrderEventConsumer.java
+  - symbol: NotificationRetryService.process
+    chain: "Retry Scheduler -> NotificationRetryService.process -> NotificationRetryService.retry -> NotificationChannel.send"
+    file: notification-service/.../service/NotificationRetryService.java
+
+must_mention:
+  - Three NotificationChannel implementations must be identified: Sms, Email, WeCom.
+  - NotificationService.process and NotificationRetryService.retry are the two direct interface-typed callers.
+  - WorkOrderEventConsumer.onWorkOrderChanged is the upstream event-driven indirect entrypoint.
+  - NotificationChannelSendTest, NotificationServiceTest, WorkOrderEventConsumerTest must be updated.
+
+must_exclude_from_impact:
+  - symbol: MetricEventPublisher.publish
+    reason: Event publication, not NotificationChannel.send.
+  - symbol: WorkOrderEventPublisher.publish
+    reason: Different interface and method.
+  - symbol: NotificationTemplateService.renderBody
+    reason: Adjacent request construction but its signature is not forced to change.
+
+recommended_validation:
+  - mvn -pl notification-service test
+  - mvn test

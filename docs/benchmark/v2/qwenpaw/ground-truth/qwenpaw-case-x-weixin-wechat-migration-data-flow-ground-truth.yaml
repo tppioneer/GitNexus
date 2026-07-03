@@ -1,0 +1,56 @@
+case_id: qwenpaw-case-x-weixin-wechat-migration-data-flow
+task_type: data_flow
+ground_truth_status: reviewed
+
+expected_entrypoints:
+  - symbol: load_config
+    file: src/qwenpaw/config/utils.py
+    reason: Loads and normalizes root configuration, including the legacy channel key.
+  - symbol: Workspace._migrate_legacy_weixin_data
+    file: src/qwenpaw/app/workspace/workspace.py
+    reason: Runs persisted chat/job/session migrations before workspace services start.
+
+expected_symbols:
+  - symbol: ChannelConfig._migrate_legacy_weixin_key
+    file: src/qwenpaw/config/config.py
+    reason: Provides in-memory Pydantic compatibility and preserves an existing canonical wechat value.
+  - symbol: _rewrite_legacy_weixin_key_on_disk
+    file: src/qwenpaw/config/utils.py
+    reason: Backs up config.json and rewrites channels.weixin to channels.wechat on disk.
+  - symbol: migrate_legacy_weixin_chats_file
+    file: src/qwenpaw/app/runner/repo/json_repo.py
+    reason: Rewrites persisted chat session_id prefixes and keeps a backup.
+  - symbol: migrate_legacy_weixin_jobs_file
+    file: src/qwenpaw/app/crons/repo/json_repo.py
+    reason: Rewrites cron dispatch target session_id prefixes.
+  - symbol: migrate_legacy_weixin_session_files
+    file: src/qwenpaw/app/runner/session.py
+    reason: Copies canonical wechat filenames and archives original legacy session files.
+  - symbol: _rewrite_weixin_in_session_filename
+    file: src/qwenpaw/app/runner/session.py
+    reason: Locates the literal _weixin-- delimiter without corrupting user ids containing underscores.
+
+expected_data_flow:
+  - field: channels.weixin
+    route: "config.json -> Config.model_validate -> channels.wechat -> backed-up rewritten config.json"
+  - field: session_id
+    route: "weixin:* in chats.json/jobs.json -> wechat:* in live records"
+  - field: session filename
+    route: "weixin--*.json -> wechat--*.json + .weixin-legacy archived original"
+
+must_mention:
+  - If both weixin and wechat exist, the canonical wechat value wins.
+  - Memory model migration alone is insufficient; raw config is re-read to decide whether disk rewrite is needed.
+  - A pre-existing canonical session file is not overwritten; only the legacy copy is archived.
+  - Startup migration failures are logged per data source and do not abort all remaining workspace initialization.
+
+must_exclude_from_impact:
+  - symbol: WecomConfig
+    reason: Enterprise WeChat uses the distinct wecom channel and must not be renamed.
+  - symbol: doctor_connectivity._probe_wechat
+    reason: Connectivity probing consumes the canonical identifier but does not migrate stored data.
+
+recommended_validation:
+  - Add isolated tests for load_config with weixin-only and weixin+wechat config files, asserting backup and canonical precedence.
+  - Add migration tests for chats.json, jobs.json and session filenames containing underscores and an existing canonical target.
+

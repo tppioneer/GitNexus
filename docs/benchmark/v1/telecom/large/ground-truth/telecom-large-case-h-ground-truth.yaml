@@ -1,0 +1,40 @@
+case: telecom-large-case-h
+ground_truth_type: field_type_change
+truth_version: "2.0"
+project_scale: "50K"
+
+note: >
+  核心变更与 12K 版本一致。50K 规模下 alarm-federated-service 的
+  FederatedAlarmRecord 也有 severity 字段，但它是不同实体，
+  不应被纳入 AlarmRecord.severity 收紧范围。
+
+target:
+  field: AlarmRecord.severity
+  type: Severity enum
+
+files_to_modify:
+  - common-domain/.../alarm/AlarmRecord.java
+  - alarm-engine-service/.../service/AlarmSeverityClassifier.java
+  - alarm-engine-service/.../service/AlarmEvaluationService.java
+  - alarm-engine-service/.../service/AlarmExportService.java
+  - workorder-service/.../service/AutoWorkOrderService.java
+  - ops-gateway-service/.../service/DashboardAggregationService.java
+
+related_services:
+  - SeverityAlarmEscalationPolicy
+  - AlarmEscalationService
+
+tests_affected:
+  - AlarmEvaluationServiceTest
+  - AlarmSeverityClassifierTest
+  - AutoWorkOrderServiceTest
+
+must_not_modify:
+  - symbol: FederatedAlarmRecord
+    reason: "Different entity in alarm-federated-service, not AlarmRecord"
+    file: alarm-federated-service/.../domain/FederatedAlarmRecord.java
+  - symbol: FederatedAlarmAggregationService
+    reason: "Works on FederatedAlarmRecord, not AlarmRecord"
+    file: alarm-federated-service/.../service/FederatedAlarmAggregationService.java
+
+verification: mvn test

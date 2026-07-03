@@ -1,0 +1,210 @@
+case_id: telecom-case-o-framework-reflection-boundary
+task_type: coverage_boundary
+truth_version: '2.1'
+ground_truth_status: draft
+expected_entrypoints:
+- id: ep.change-plugin-loader
+  symbol: ChangePluginLoader
+  file: network-change-service/src/main/java/com/example/telecom/change/plugin/ChangePluginLoader.java
+- id: ep.audit-operation-aspect
+  symbol: AuditOperationAspect
+  file: network-change-service/src/main/java/com/example/telecom/change/aop/AuditOperationAspect.java
+expected_symbols:
+- id: sym.change-approved-listener
+  symbol: ChangeApprovedListener
+  file: network-change-service/src/main/java/com/example/telecom/change/event/ChangeApprovedListener.java
+- id: sym.change-completed-listener
+  symbol: ChangeCompletedListener
+  file: network-change-service/src/main/java/com/example/telecom/change/event/ChangeCompletedListener.java
+- id: sym.change-notification-listener
+  symbol: ChangeNotificationListener
+  file: network-change-service/src/main/java/com/example/telecom/change/event/ChangeNotificationListener.java
+- id: sym.change-validation-plugin
+  symbol: ChangeValidationPlugin
+  file: network-change-service/src/main/java/com/example/telecom/change/plugin/ChangeValidationPlugin.java
+- id: sym.benchmark-change-validation-plugin
+  symbol: BenchmarkChangeValidationPlugin
+  file: network-change-service/src/main/java/com/example/telecom/change/plugin/BenchmarkChangeValidationPlugin.java
+- id: sym.in-memory-audit-sink
+  symbol: InMemoryAuditSink
+  file: network-change-service/src/main/java/com/example/telecom/change/aop/InMemoryAuditSink.java
+- id: sym.plugin-descriptor
+  symbol: PluginDescriptor
+  file: network-change-service/src/main/java/com/example/telecom/change/plugin/PluginDescriptor.java
+expected_facts:
+- id: fact.event-approved-dispatch
+  description: publishEvent(ChangeApprovedEvent) dispatches to ChangeApprovedListener.onApproved via @EventListener — FRAMEWORK_EVENT_DISPATCH not CALLS
+- id: fact.event-completed-after-commit
+  description: ChangeCompletedListener.afterCommit uses @TransactionalEventListener(AFTER_COMMIT) — only fires after transaction commits
+- id: fact.event-async-notification
+  description: ChangeNotificationListener.notifyAsync uses @Async @EventListener — dispatched on separate thread
+- id: fact.aop-around-advice
+  description: AuditOperationAspect uses @Around(@annotation(auditOperation)) to intercept methods with @AuditOperation
+- id: fact.proceed-not-direct-call
+  description: ProceedingJoinPoint.proceed() is NOT a static call to business method — it is AOP framework invocation chain
+- id: fact.class-for-name-reflection
+  description: Class.forName(pluginClassName) is runtime string-to-class resolution — NOT a static call edge
+- id: fact.method-invoke-reflection
+  description: Method.invoke(plugin, context) is reflective invocation — target determined at runtime not compile time
+- id: fact.service-loader-spi
+  description: ServiceLoader.load(ChangeValidationPlugin.class) discovers BenchmarkChangeValidationPlugin via META-INF/services — SERVICE_LOADER edge
+- id: fact.descriptor-string-config
+  description: PluginDescriptor.className and executeMethodName are configuration strings not code references — cannot be resolved statically
+noise_items:
+- id: noise.o-plugindescriptor-0
+  symbol: PluginDescriptor.executeMethodName = "execute"
+  reason: Configuration string — NOT a method call
+- id: noise.o-plugindescriptor-1
+  symbol: PluginDescriptor.className = "SomeClass"
+  reason: Configuration string — NOT a class reference
+- id: noise.o-changedocumentation-2
+  symbol: ChangeDocumentation.getMappingExamples()
+  reason: Documentation strings — NOT annotations or routes
+spring_event_dispatch:
+- id: event-approved
+  publisher_method: ChangePlanService.approve
+  publisher_file: network-change-service/src/main/java/com/example/telecom/change/service/ChangePlanService.java
+  call_expression: eventPublisher.publishEvent(new ChangeApprovedEvent(planId, approverId, true))
+  event_type: ChangeApprovedEvent
+  edge_kind: FRAMEWORK_EVENT_DISPATCH
+  listeners:
+  - class: ChangeApprovedListener
+    method: onApproved(ChangeApprovedEvent)
+    file: network-change-service/src/main/java/com/example/telecom/change/event/ChangeApprovedListener.java
+    annotation: '@EventListener'
+    binding: Spring framework resolves ChangeApprovedEvent → ChangeApprovedListener.onApproved at runtime
+- id: event-completed-sync
+  publisher_method: ChangeExecutionService.execute
+  publisher_file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeExecutionService.java
+  call_expression: eventPublisher.publishEvent(new ChangeCompletedEvent(...))
+  event_type: ChangeCompletedEvent
+  edge_kind: FRAMEWORK_EVENT_DISPATCH
+  listeners:
+  - class: ChangeCompletedListener
+    method: afterCommit(ChangeCompletedEvent)
+    file: network-change-service/src/main/java/com/example/telecom/change/event/ChangeCompletedListener.java
+    annotation: '@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)'
+    binding: Event delivered ONLY after the enclosing transaction commits
+- id: event-completed-async
+  publisher_method: ChangeExecutionService.execute
+  event_type: ChangeCompletedEvent
+  edge_kind: FRAMEWORK_EVENT_DISPATCH
+  listeners:
+  - class: ChangeNotificationListener
+    method: notifyAsync(ChangeCompletedEvent)
+    file: network-change-service/src/main/java/com/example/telecom/change/event/ChangeNotificationListener.java
+    annotation: '@Async @EventListener'
+    binding: Async dispatch — executed on a separate thread
+spring_event_note: 'publishEvent() to listener is NOT a Java direct call. Static analysis tools must classify these as FRAMEWORK_EVENT_DISPATCH, not CALLS. The connection between publisher and listener
+  is resolved by Spring''s event mechanism at runtime, not by compile-time type analysis.
+
+  '
+aop_dispatch:
+- id: aop-audit-operation
+  aspect: AuditOperationAspect
+  file: network-change-service/src/main/java/com/example/telecom/change/aop/AuditOperationAspect.java
+  annotation: '@Aspect @Component'
+  advice:
+    type: '@Around'
+    pointcut: '@annotation(auditOperation)'
+    parameter_binding: AuditOperation auditOperation
+  edge_kind: FRAMEWORK_AOP
+  intercepted_methods:
+  - target: ChangePlanService.createPlan
+    annotation: '@AuditOperation(action="create-plan", category=CHANGE)'
+  - target: ChangePlanService.updateRisk
+    annotation: '@AuditOperation(action="update-risk", category=CHANGE, sensitive=true)'
+  - target: ChangeAuditService.record
+    annotation: '@AuditOperation(action="record-audit", category=CHANGE)'
+  - target: Any method with @CriticalChange (meta-annotated with @AuditOperation)
+    indirect: true
+    meta_chain: '@CriticalChange → @AuditOperation'
+  proceeds_through: ProceedingJoinPoint.proceed()
+  note: 'ProceedingJoinPoint.proceed() is NOT a static call to the business method. It is the AOP framework''s mechanism to continue the invocation chain. The edge from aspect to target method is FRAMEWORK_AOP,
+    not CALLS.
+
+    '
+reflection_boundary:
+- id: reflection-classForName
+  caller: ChangePluginLoader.loadAndExecuteReflective
+  file: network-change-service/src/main/java/com/example/telecom/change/plugin/ChangePluginLoader.java
+  expressions:
+  - expression: Class.forName(pluginClassName)
+    edge_kind: REFLECTION_BOUNDARY
+    note: String-to-class resolution at runtime — NOT a static call edge
+  - expression: type.getDeclaredConstructor().newInstance()
+    edge_kind: REFLECTION_BOUNDARY
+    note: Reflective instantiation — target class determined by string parameter
+  - expression: type.getMethod("execute", ChangeContext.class)
+    edge_kind: REFLECTION_BOUNDARY
+    note: Method lookup by name string — NOT a compile-time method reference
+  - expression: method.invoke(plugin, context)
+    edge_kind: REFLECTION_BOUNDARY
+    note: Reflective invocation — target determined at runtime
+  runtime_target:
+    class: BenchmarkChangeValidationPlugin
+    configuration_source: 'application.properties: telecom.change.plugin-class-name'
+    fqn: com.example.telecom.change.plugin.BenchmarkChangeValidationPlugin
+- id: service-loader
+  caller: ChangePluginLoader.loadViaServiceLoader
+  file: network-change-service/src/main/java/com/example/telecom/change/plugin/ChangePluginLoader.java
+  expression: ServiceLoader.load(ChangeValidationPlugin.class)
+  edge_kind: SERVICE_LOADER
+  service_interface: ChangeValidationPlugin
+  meta_inf_services_file: network-change-service/src/main/resources/META-INF/services/com.example.telecom.change.plugin.ChangeValidationPlugin
+  registered_implementations:
+  - com.example.telecom.change.plugin.BenchmarkChangeValidationPlugin
+- id: descriptor-based
+  caller: ChangePluginLoader.executeFromDescriptor
+  file: network-change-service/src/main/java/com/example/telecom/change/plugin/ChangePluginLoader.java
+  expression: loadAndExecuteReflective(descriptor.getClassName(), context)
+  edge_kind: REFLECTION_BOUNDARY
+  configuration_source: PluginDescriptor.className — string configuration, not code reference
+reflection_boundary_note: 'Reflection and ServiceLoader targets cannot be determined by pure static call-graph analysis. Tools should report these as REFLECTION_BOUNDARY or SERVICE_LOADER edges, not as
+  regular CALLS. Finding the class name string in source code does NOT mean the tool has resolved a Java call edge.
+
+  '
+boundary_classification:
+- edge_kind: JAVA_DIRECT_CALL
+  examples:
+  - ChangePlanService.approve → snapshotStore.save
+  - ChangeExecutionService.execute → registry.resolve
+- edge_kind: JAVA_INTERFACE_DISPATCH
+  examples:
+  - executor.execute(context) → ChangeExecutor implementations
+- edge_kind: FRAMEWORK_EVENT_DISPATCH
+  examples:
+  - publishEvent(ChangeApprovedEvent) → ChangeApprovedListener.onApproved
+  - publishEvent(ChangeCompletedEvent) → ChangeCompletedListener.afterCommit
+  - publishEvent(ChangeCompletedEvent) → ChangeNotificationListener.notifyAsync
+- edge_kind: FRAMEWORK_AOP
+  examples:
+  - AuditOperationAspect.around → @AuditOperation methods via ProceedingJoinPoint
+- edge_kind: REFLECTION_BOUNDARY
+  examples:
+  - Class.forName → newInstance → getMethod → invoke
+  - PluginDescriptor.getClassName() → reflective load
+- edge_kind: SERVICE_LOADER
+  examples:
+  - ServiceLoader.load(ChangeValidationPlugin.class) → BenchmarkChangeValidationPlugin
+test_classes:
+- name: CaseOFrameworkReflectionTest
+  file: network-change-service/src/test/java/com/example/telecom/change/plugin/CaseOFrameworkReflectionTest.java
+- name: ChangeEventListenerTest
+  file: network-change-service/src/test/java/com/example/telecom/change/event/ChangeEventListenerTest.java
+- name: AuditOperationAspectTest
+  file: network-change-service/src/test/java/com/example/telecom/change/service/AuditOperationAspectTest.java
+recommended_validation:
+- mvn -pl network-change-service -am test -Dtest=CaseOFrameworkReflectionTest,ChangeEventListenerTest,AuditOperationAspectTest
+source_commit: 5c2fdcdf9e3b7829fc8ace183e2b0876ccbb188a
+source_dirty: true
+source_scope_clean: true
+source_project: telecom-ops-platform
+source_module: network-change-service
+reviewed_at: '2026-07-20'
+analysis_scope: src/main/java only
+dimension_weights:
+  framework_boundary: 40
+  symbols: 25
+  facts: 25
+  noise: 10

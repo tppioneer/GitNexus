@@ -1,0 +1,130 @@
+version: 1
+
+agents:
+  claude-code:
+    display_name: Claude Code
+    adapter: claude-code-cli
+    verified_on_current_machine: true
+    non_interactive_mode:
+      command: claude
+      required_args:
+        - --print
+        - --output-format
+        - json
+    supports:
+      fixed_model: true
+      json_output: true
+      stream_output: true
+      allowed_tools_cli: true
+      disallowed_tools_cli: true
+      mcp_config_cli: true
+      working_directory: via_runner_process_cwd
+    notes:
+      - The local `claude --help` command was available when this profile was written.
+      - Use explicit model names for reproducibility; avoid unversioned latest aliases in final benchmark runs.
+
+  opencode:
+    display_name: OpenCode
+    adapter: opencode-cli
+    verified_on_current_machine: true
+    non_interactive_mode:
+      command: opencode
+      required_args:
+        - run
+        - --format
+        - json
+    supports:
+      fixed_model: true
+      json_output: true
+      stream_output: unknown
+      allowed_tools_cli: false
+      disallowed_tools_cli: false
+      mcp_config_cli: false
+      working_directory: --dir
+    notes:
+      - "`opencode --help` and `opencode run --help` were available on the current machine."
+      - "OpenCode supports non-interactive `opencode run --format json` and `--dir` for target cwd selection."
+      - "OpenCode does not expose Claude Code style allowed-tools enforcement in the verified CLI help output."
+      - "Mark OpenCode runs as `policy_enforced: false` unless a project-level OpenCode config enforces the same policy."
+
+tool_policies:
+  grep:
+    purpose: Traditional text-search baseline.
+    allowed_capabilities:
+      - shell_rg
+      - read_file
+      - run_validation_commands
+      - edit_for_modification_cases
+    forbidden_capabilities:
+      - gitnexus_query
+      - gitnexus_context
+      - gitnexus_impact
+      - gitnexus_detect_changes
+      - gitnexus_pdg_query
+    invalid_if:
+      - Any GitNexus MCP or CLI graph query is used for retrieval.
+
+  graph:
+    purpose: Text-search baseline enhanced by GitNexus structural retrieval.
+    allowed_capabilities:
+      - gitnexus_query
+      - gitnexus_context
+      - gitnexus_impact
+      - gitnexus_detect_changes_for_post_change_checks
+      - load_gitnexus_exploring_skill
+      - load_gitnexus_debugging_skill
+      - shell_rg_for_local_confirmation
+      - glob_for_local_confirmation
+      - find_for_local_confirmation
+      - read_file
+      - run_validation_commands
+      - edit_for_modification_cases
+    required_capabilities:
+      - gitnexus_graph_retrieval
+      - gitnexus_exploring_skill
+      - gitnexus_debugging_skill
+      - repository_root_mcp_config
+    forbidden_capabilities: []
+    invalid_if:
+      - The run has zero GitNexus graph retrieval calls.
+      - The final answer contains no graph-derived evidence.
+      - A repo-scoped GitNexus call does not use target_project.gitnexus_repo exactly.
+      - Either required GitNexus skill was not loaded before graph retrieval.
+      - The graph command did not use the repository-root .mcp.json with strict MCP configuration.
+    soft_violations:
+      - GitNexus is used only as optional decoration and does not participate in the main discovery path.
+      - The run starts with broad text/file search before attempting GitNexus.
+      - Text search dominates the investigation even though graph results were available.
+      - Glob/find are used for repository-wide discovery rather than local confirmation.
+
+  mixed:
+    purpose: Realistic product-experience run, not a pure-control comparison.
+    allowed_capabilities:
+      - shell_rg
+      - read_file
+      - gitnexus_query
+      - gitnexus_context
+      - gitnexus_impact
+      - gitnexus_detect_changes
+      - gitnexus_pdg_query
+      - run_validation_commands
+      - edit_for_modification_cases
+    forbidden_capabilities: []
+
+run_matrix_defaults:
+  repeats_per_cell: 3
+  required_agents:
+    - claude-code
+    - opencode
+  required_tool_policies:
+    - grep
+    - graph
+  optional_tool_policies:
+    - mixed
+  randomization:
+    shuffle_run_order: true
+    isolate_repeated_runs: true
+  isolation:
+    analysis_cases_require_clean_context: true
+    modification_cases_require_clean_worktree: true
+    golden_answers_hidden_from_agents: true

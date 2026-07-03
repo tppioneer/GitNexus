@@ -1,0 +1,17 @@
+id: qwenpaw-case-x-weixin-wechat-migration-data-flow
+name: QwenPaw legacy weixin to wechat migration data flow
+level: L2
+task_type: data_flow
+repo: QwenPaw
+status: reviewed
+
+prompt: |
+  一个从旧版本升级的 workspace 仍保存着 `weixin` 渠道标识。请分析应用启动后，这个旧标识如何在配置、聊天记录、定时任务和会话文件中迁移为 `wechat`，以及原始数据如何保留以便恢复。
+  请区分内存兼容、磁盘改写和启动期数据迁移，说明冲突或迁移失败时的行为。
+  不要修改代码，只输出有证据支持的数据流、兼容边界和验证建议。
+
+extra_desc: |
+  Case 设计与人工审阅提示，不进入模型公开载荷：覆盖 ChannelConfig validator、load_config 磁盘备份改写、Workspace 启动迁移、chats/jobs JSON 和 SafeJSONSession 文件名归档。
+
+ground_truth: docs/benchmark/v2/qwenpaw/ground-truth/qwenpaw-case-x-weixin-wechat-migration-data-flow-ground-truth.yaml
+

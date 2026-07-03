@@ -1,0 +1,17 @@
+id: telecom-large-case-v-federated-alarm-ingest-flow
+name: Telecom Large federated alarm ingestion flow
+level: L2
+task_type: flow_tracing
+repo: telecom-ops-platform-large
+status: reviewed
+
+prompt: |
+  外部区域向联邦告警接口上报一条告警后，系统需要校验来源、规范化并保存告警，然后触发后续去重、关联和聚合处理。
+  请从 HTTP 入口追踪这条告警的完整执行流程，并区分同步响应路径与事件驱动的后续处理。
+  不要修改代码，只输出有证据支持的调用链、条件分支、风险和验证建议。
+
+extra_desc: |
+  人工审阅提示，不进入公开载荷：核对 IngestController、AlarmIngestionService、SourceRegistry、Mapper、Repository、Publisher、FederatedAlarmEventConsumer、dedup/correlation/aggregation。
+
+ground_truth: docs/benchmark/v2/telecom/large/ground-truth/telecom-large-case-v-ground-truth.yaml
+

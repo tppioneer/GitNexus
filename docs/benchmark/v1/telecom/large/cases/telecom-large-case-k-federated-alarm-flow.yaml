@@ -1,0 +1,57 @@
+case: telecom-large-case-k-federated-alarm-flow
+level: L1 - flow_tracing
+title: "联邦告警汇聚执行流追踪"
+
+description: >
+  50,000 行规模特有的 case。追踪联邦告警从多个局站告警源上报，
+  到汇聚、去重、关联、生成联邦告警的完整调用链。
+
+task: >
+  请分析联邦告警从多个局站告警源上报，到汇聚、去重、关联、生成联邦告警的完整调用链，
+  并标注每一步副作用。
+
+entry_point:
+  controller: FederatedAlarmIngestController
+  method: ingestAlarm
+  route: POST /api/federated/alarms
+
+key_components:
+  - AlarmIngestionService
+  - FederatedAlarmSourceRegistry
+  - FederatedAlarmAggregationService
+  - AggregationStrategy
+  - FederatedAlarmDeduplicationService
+  - FederatedAlarmCorrelationService
+  - FederatedCorrelationEngine
+  - CorrelationRuleMatcher
+  - AlarmFederationEventPublisher
+
+interference:
+  - "AlarmEvaluationService (alarm-engine, different from federated flow)"
+  - "AlarmCorrelationService (alarm-engine, not federated)"
+  - "AlarmDeduplicationService (alarm-engine, not federated)"
+
+graph_queries:
+  - 'query({search_query: "federated alarm aggregation flow"})'
+  - 'context({name: "FederatedAlarmIngestController"})'
+  - 'context({name: "FederatedAlarmAggregationService"})'
+
+grep_searches:
+  - rg "FederatedAlarmIngestController|ingestAlarm"
+  - rg "FederatedAlarmAggregationService|AggregationStrategy"
+  - rg "FederatedAlarmDeduplicationService|FederatedCorrelationEngine"
+
+ground_truth: docs/benchmark/v1/telecom/large/ground-truth/telecom-large-case-k-ground-truth.yaml
+
+scoring:
+  must_identify_side_effects:
+    - 联邦告警源识别
+    - 告警汇聚策略选择
+    - 跨区域告警去重
+    - 告警关联
+    - 联邦告警写入 repository
+    - 联邦告警事件发布
+  penalty_items:
+    - 把 AlarmEvaluationService 纳入联邦链
+    - 把 AlarmCorrelationService（非 federated）纳入联邦链
+    - 把 AlarmDeduplicationService（非 federated）纳入联邦链

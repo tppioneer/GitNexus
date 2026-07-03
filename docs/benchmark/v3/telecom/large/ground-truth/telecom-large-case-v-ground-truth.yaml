@@ -1,0 +1,53 @@
+case_id: telecom-large-case-v-federated-alarm-ingest-flow
+task_type: flow_tracing
+ground_truth_status: reviewed
+
+expected_entrypoints:
+  - symbol: FederatedAlarmIngestController.ingestSingle
+    file: alarm-federated-service/src/main/java/com/example/telecom/alarm/federated/controller/FederatedAlarmIngestController.java
+    reason: POST /api/federated/alarms/ingest/single maps the saved record into a 201 response.
+  - symbol: FederatedAlarmIngestController.ingestBatch
+    file: alarm-federated-service/src/main/java/com/example/telecom/alarm/federated/controller/FederatedAlarmIngestController.java
+    reason: Batch endpoint continues after per-item failures and reports received versus ingested counts.
+
+expected_symbols:
+  - symbol: AlarmIngestionService.ingest
+    file: alarm-federated-service/src/main/java/com/example/telecom/alarm/federated/service/AlarmIngestionService.java
+    reason: Validates fields, normalizes source, checks registration, parses severity, enriches, deduplicates, saves and publishes.
+  - symbol: AlarmIngestionService.validateSource
+    file: alarm-federated-service/src/main/java/com/example/telecom/alarm/federated/service/AlarmIngestionService.java
+    reason: Accepts a source found in either repository or source registry.
+  - symbol: FederatedAlarmDeduplicationService.isDuplicate
+    file: alarm-federated-service/src/main/java/com/example/telecom/alarm/federated/service/FederatedAlarmDeduplicationService.java
+    reason: Synchronous ingestion step that may mark the new record DEDUPLICATED.
+  - symbol: FederatedAlarmRepository.save
+    file: alarm-federated-service/src/main/java/com/example/telecom/alarm/federated/repository/FederatedAlarmRepository.java
+    reason: Persists the enriched record before response mapping.
+  - symbol: AlarmFederationEventPublisher.publishAlarmIngested
+    file: alarm-federated-service/src/main/java/com/example/telecom/alarm/federated/event/AlarmFederationEventPublisher.java
+    reason: Adds a FederatedAlarmEvent to an internal list but does not dispatch the consumer.
+  - symbol: FederatedAlarmEventConsumer.onAlarmIngested
+    file: alarm-federated-service/src/main/java/com/example/telecom/alarm/federated/event/FederatedAlarmEventConsumer.java
+    reason: Contains audit/correlation follow-up logic but has no production caller from the publisher.
+
+expected_call_chains:
+  - route: "ingestSingle -> AlarmIngestionService.ingest -> validate/normalize/source check -> enrich -> isDuplicate -> repository.save -> publishAlarmIngested -> mapper.toResponse"
+  - route: "ingestBatch -> ingest per item; exception -> skip item; result totalReceived/totalIngested"
+
+must_mention:
+  - Source IDs are trimmed, lowercased and whitespace-normalized before lookup and persistence.
+  - Missing region can be enriched from the source repository; blank description receives a generated fallback.
+  - Deduplication is synchronous and only changes record status before save.
+  - The event publisher stores an event in memory; it does not call FederatedAlarmEventConsumer, so correlation, escalation and aggregation are not automatically reachable from ingestion.
+  - Batch ingestion swallows per-item exceptions without returning item-level errors.
+
+must_exclude_from_impact:
+  - symbol: FederatedAlarmAggregationService.aggregate
+    reason: No caller from ingest or publisher; do not claim it runs on every ingestion.
+  - symbol: FederatedAlarmCorrelationService.correlate
+    reason: Present behind an unconnected consumer, not part of the proven production path.
+
+recommended_validation:
+  - mvn -pl alarm-federated-service -am test -Dtest=AlarmIngestionServiceTest,FederatedAlarmDeduplicationServiceTest
+  - Add a reachability test proving publishAlarmIngested records an event but does not invoke FederatedAlarmEventConsumer unless explicitly wired.
+

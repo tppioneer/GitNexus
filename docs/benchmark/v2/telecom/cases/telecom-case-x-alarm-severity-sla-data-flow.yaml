@@ -1,0 +1,17 @@
+id: telecom-case-x-alarm-severity-sla-data-flow
+name: Telecom alarm severity to work-order SLA data flow
+level: L2
+task_type: data_flow
+repo: telecom-ops-platform
+status: reviewed
+
+prompt: |
+  请分析一个告警事件的 severity 如何决定是否自动创建工单、工单 priority 的取值，并继续影响 SLA 判断和升级策略。
+  需要说明未创建工单的分支、字段映射边界以及同名 severity/priority 字段中哪些与这条链路无关。
+  不要修改代码，只输出有证据支持的数据流、业务条件和验证建议。
+
+extra_desc: |
+  人工审阅提示，不进入公开载荷：核对 AlarmEventConsumer、AutoWorkOrderService.mapPriority、WorkOrder、WorkOrderSlaService、SlaEscalationPolicy/WorkOrderEscalationService。
+
+ground_truth: docs/benchmark/v2/telecom/ground-truth/telecom-case-x-ground-truth.yaml
+

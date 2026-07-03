@@ -1,0 +1,53 @@
+id: qwenpaw-case-b-plugin-loader-impact
+name: QwenPaw plugin loader impact analysis
+level: L2
+task_type: impact_analysis
+repo: QwenPaw
+status: draft-ground-truth
+
+prompt: |
+  请分析如果要调整 QwenPaw 插件加载规则，例如要求 frontend-only 插件也必须声明一个显式 capability 字段，
+  需要检查哪些插件加载、manifest、注册、依赖安装、卸载和清理路径。
+  重点说明：
+  1. 插件发现如何读取 plugin.json；
+  2. backend/frontend entry 如何判定；
+  3. backend 插件如何动态 import 并注册；
+  4. requirements.txt 依赖安装路径和 pip/uv fallback；
+  5. unload/delete 时如何清理 registry、sys.modules 和工具导出；
+  6. 这类改动需要哪些测试。
+  不要修改代码，只输出影响分析、关键符号、风险和验证建议。
+
+tool_policies:
+  grep:
+    allowed:
+      - rg
+      - read_file
+    forbidden:
+      - gitnexus.query
+      - gitnexus.context
+      - gitnexus.impact
+      - gitnexus.detect_changes
+  graph:
+    allowed:
+      - gitnexus.query
+      - gitnexus.context
+      - gitnexus.impact
+      - read_file
+    forbidden:
+      - broad_rg_scan
+  mixed:
+    allowed:
+      - rg
+      - read_file
+      - gitnexus.query
+      - gitnexus.context
+      - gitnexus.impact
+
+suggested_queries:
+  grep:
+    - 'rg "class PluginLoader|discover_plugins|load_plugin|load_plugin_from_path|unload_plugin|_cleanup_plugin_tools" src/qwenpaw/plugins'
+    - 'rg "PluginManifest|PluginRecord|PluginRegistry|PluginApi" src/qwenpaw/plugins'
+  graph:
+    - 'query({search_query: "PluginLoader discover load unload plugin manifest registry"})'
+    - 'context({name: "PluginLoader"})'
+    - 'impact({target: "PluginLoader.load_plugin", direction: "upstream"})'

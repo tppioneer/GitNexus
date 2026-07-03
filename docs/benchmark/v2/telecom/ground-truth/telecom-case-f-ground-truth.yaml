@@ -1,0 +1,68 @@
+case_id: telecom-case-f-workorder-transition-impact
+task_type: impact_analysis
+
+target:
+  symbol: WorkOrderStateMachine.transition
+  file: workorder-service/src/main/java/com/example/telecom/workorder/workflow/WorkOrderStateMachine.java
+  current_signature: "transition(WorkOrder workOrder, WorkOrderStatus targetStatus)"
+  proposed_signature: "transition(WorkOrder workOrder, WorkOrderStatus targetStatus, TransitionContext context)"
+  graph_risk: CRITICAL
+  graph_blast_radius:
+    direct_callers: 19
+    total_impacted_with_depth_4: 45
+    affected_process_groups: 13
+
+expected_symbols:
+  - symbol: WorkOrderStateMachine.transition
+    file: workorder-service/.../workflow/WorkOrderStateMachine.java
+    reason: Core state transition method with ALLOWED_TRANSITIONS validation.
+  - symbol: WorkOrderFlowService.assign
+    file: workorder-service/.../service/WorkOrderFlowService.java
+    reason: Direct production caller, targetStatus=ASSIGNED.
+  - symbol: WorkOrderFlowService.startProcessing
+    file: workorder-service/.../service/WorkOrderFlowService.java
+    reason: Direct production caller, targetStatus=PROCESSING.
+  - symbol: WorkOrderFlowService.resolve
+    file: workorder-service/.../service/WorkOrderFlowService.java
+    reason: Direct production caller, targetStatus=RESOLVED.
+  - symbol: WorkOrderFlowService.close
+    file: workorder-service/.../service/WorkOrderFlowService.java
+    reason: Direct production caller, targetStatus=CLOSED.
+  - symbol: WorkOrderFlowService.escalate
+    file: workorder-service/.../service/WorkOrderFlowService.java
+    reason: Direct production caller, targetStatus=ESCALATED.
+  - symbol: WorkOrderFlowService.cancel
+    file: workorder-service/.../service/WorkOrderFlowService.java
+    reason: Direct production caller, targetStatus=CANCELLED.
+
+indirect_entrypoints:
+  - symbol: WorkOrderFlowController.transition
+    chain: "HTTP -> WorkOrderFlowController.transition -> WorkOrderFlowService -> transition"
+    file: workorder-service/.../controller/WorkOrderFlowController.java
+  - symbol: WorkOrderBulkActionController.bulkAssign
+    chain: "HTTP -> WorkOrderBulkActionController.bulkAssign -> WorkOrderBulkActionService -> WorkOrderFlowService -> transition"
+    file: workorder-service/.../controller/WorkOrderBulkActionController.java
+  - symbol: AutoWorkOrderService.createForAlarm
+    chain: "AlarmEventConsumer.onAlarmCreated -> AutoWorkOrderService.createForAlarm -> WorkOrderFlowService -> transition"
+    file: workorder-service/.../service/AutoWorkOrderService.java
+  - symbol: WorkOrderEscalationService
+    chain: "Escalation Scheduler -> WorkOrderEscalationService -> WorkOrderFlowService.escalate -> transition"
+    file: workorder-service/.../service/WorkOrderEscalationService.java
+
+must_mention:
+  - WorkOrderFlowService has 6 direct callers, each targeting a different WorkOrderStatus.
+  - WorkOrderStateMachine validates ALLOWED_TRANSITIONS; invalid transitions throw ValidationException.
+  - Successful transitions update WorkOrder.status/updatedTime and trigger WorkOrderEventPublisher.
+  - TransitionContext propagation must preserve event metadata across all six flow methods.
+  - Bulk operations, auto-workorder, and escalation are indirect upstream entrypoints.
+  - Tests: WorkOrderStateMachineTest, WorkOrderStateMachineWaitingVendorTest, WorkOrderFlowServiceTest, WorkOrderBulkActionServiceTest, WorkOrderLifecycleIntegrationTest, AutoWorkOrderServiceTest, AlarmEventConsumerTest, WorkOrderEscalationServiceTest.
+
+must_exclude_from_impact:
+  - symbol: DeviceStateMachine.transition
+    reason: Device lifecycle state machine in a different bounded context.
+  - symbol: StateTransitionValidator
+    reason: Include only if it calls the exact WorkOrderStateMachine method; name similarity alone is insufficient.
+
+recommended_validation:
+  - mvn -pl workorder-service test
+  - mvn test

@@ -1,0 +1,193 @@
+case: telecom-large-case-b
+ground_truth_type: impact_analysis
+truth_version: "2.0"
+project_scale: "50K"
+expected_files:
+  - file: alarm-engine-service/.../rule/CpuUsageRuleEvaluator.java
+  - file: alarm-engine-service/.../rule/MemoryUsageRuleEvaluator.java
+  - file: alarm-engine-service/.../rule/OpticalPowerRuleEvaluator.java
+  - file: alarm-engine-service/.../rule/PacketLossRuleEvaluator.java
+  - file: alarm-engine-service/.../rule/TemperatureRuleEvaluator.java
+  - file: alarm-engine-service/.../service/AlarmEvaluationService.java
+  - file: alarm-engine-service/.../rule/RuleEvaluatorRegistry.java
+  - file: alarm-engine-service/.../consumer/DeviceMetricEventConsumer.java
+  - file: alarm-engine-service/src/test/java/.../AlarmEvaluationServiceTest.java
+  - file: alarm-engine-service/src/test/java/.../RuleEvaluatorRegistryTest.java
+  - file: alarm-engine-service/src/test/java/.../CpuUsageRuleEvaluatorTest.java
+  - file: alarm-engine-service/src/test/java/.../OpticalPowerRuleEvaluatorTest.java
+  - file: alarm-engine-service/src/test/java/.../PacketLossRuleEvaluatorTest.java
+expected_symbols:
+  - symbol: CpuUsageRuleEvaluator
+  - symbol: MemoryUsageRuleEvaluator
+  - symbol: OpticalPowerRuleEvaluator
+  - symbol: PacketLossRuleEvaluator
+  - symbol: TemperatureRuleEvaluator
+  - symbol: AlarmEvaluationService
+  - symbol: RuleEvaluatorRegistry
+  - symbol: DeviceMetricEventConsumer
+  - symbol: AlarmEvaluationServiceTest
+  - symbol: RuleEvaluatorRegistryTest
+  - symbol: CpuUsageRuleEvaluatorTest
+  - symbol: OpticalPowerRuleEvaluatorTest
+  - symbol: PacketLossRuleEvaluatorTest
+
+note: >
+  与 12K 版本相比，核心答案不变（5 个目标实现 + 2 个核心调用方 + 测试）。
+  但干扰 evaluate 方法从 4 个扩展到 28 个，分布在 8 个模块中。
+  评分重点在于 agent 能否在 33+ 个 evaluate 方法中精确识别出 5 个目标。
+
+target:
+  interface: RuleEvaluator
+  file: alarm-engine-service/src/main/java/com/example/telecom/alarm/rule/RuleEvaluator.java
+  change: "add EvaluationContext as third parameter to evaluate()"
+
+must_include_in_impact:
+  implementations:
+    - symbol: CpuUsageRuleEvaluator
+      file: alarm-engine-service/.../rule/CpuUsageRuleEvaluator.java
+      note: "Has overloaded evaluate(DeviceInfo) — must distinguish signatures"
+    - symbol: MemoryUsageRuleEvaluator
+      file: alarm-engine-service/.../rule/MemoryUsageRuleEvaluator.java
+    - symbol: OpticalPowerRuleEvaluator
+      file: alarm-engine-service/.../rule/OpticalPowerRuleEvaluator.java
+    - symbol: PacketLossRuleEvaluator
+      file: alarm-engine-service/.../rule/PacketLossRuleEvaluator.java
+    - symbol: TemperatureRuleEvaluator
+      file: alarm-engine-service/.../rule/TemperatureRuleEvaluator.java
+
+  callers:
+    - symbol: AlarmEvaluationService
+      file: alarm-engine-service/.../service/AlarmEvaluationService.java
+      note: "Core caller — must construct and pass EvaluationContext"
+    - symbol: RuleEvaluatorRegistry
+      file: alarm-engine-service/.../rule/RuleEvaluatorRegistry.java
+      note: "Returns RuleEvaluator — type reference check needed"
+    - symbol: DeviceMetricEventConsumer
+      file: alarm-engine-service/.../consumer/DeviceMetricEventConsumer.java
+      note: "Indirect caller via AlarmEvaluationService"
+
+  tests:
+    - symbol: AlarmEvaluationServiceTest
+      file: alarm-engine-service/src/test/java/.../AlarmEvaluationServiceTest.java
+    - symbol: RuleEvaluatorRegistryTest
+      file: alarm-engine-service/src/test/java/.../RuleEvaluatorRegistryTest.java
+    - symbol: CpuUsageRuleEvaluatorTest
+      file: alarm-engine-service/src/test/java/.../CpuUsageRuleEvaluatorTest.java
+    - symbol: OpticalPowerRuleEvaluatorTest
+      file: alarm-engine-service/src/test/java/.../OpticalPowerRuleEvaluatorTest.java
+    - symbol: PacketLossRuleEvaluatorTest
+      file: alarm-engine-service/src/test/java/.../PacketLossRuleEvaluatorTest.java
+
+must_exclude_from_impact:
+  # alarm-engine-service (7)
+  - symbol: SlaEvaluator.evaluate
+    reason: "NOT a RuleEvaluator implementation"
+    file: alarm-engine-service/.../service/SlaEvaluator.java
+  - symbol: RiskEvaluator.evaluate
+    reason: "NOT a RuleEvaluator implementation"
+    file: alarm-engine-service/.../service/RiskEvaluator.java
+  - symbol: SuppressionRuleEvaluator.evaluate
+    reason: "NOT a RuleEvaluator implementation"
+    file: alarm-engine-service/.../service/SuppressionRuleEvaluator.java
+  - symbol: AlarmEscalationEvaluator.evaluate
+    reason: "NOT a RuleEvaluator implementation"
+    file: alarm-engine-service/.../service/AlarmEscalationEvaluator.java
+  - symbol: AlarmEscalationPolicy.evaluate
+    reason: "AlarmEscalationPolicy interface, not RuleEvaluator"
+    file: alarm-engine-service/.../policy/AlarmEscalationPolicy.java
+  - symbol: SeverityAlarmEscalationPolicy.evaluate
+    reason: "AlarmEscalationPolicy impl, not RuleEvaluator"
+    file: alarm-engine-service/.../policy/SeverityAlarmEscalationPolicy.java
+  - symbol: DurationAlarmEscalationPolicy.evaluate
+    reason: "AlarmEscalationPolicy impl, not RuleEvaluator"
+    file: alarm-engine-service/.../policy/DurationAlarmEscalationPolicy.java
+
+  # workorder-service (4)
+  - symbol: EscalationPolicy.evaluate
+    reason: "Different interface in workorder-service"
+    file: workorder-service/.../workflow/EscalationPolicy.java
+  - symbol: SeverityEscalationPolicy.evaluate
+    reason: "EscalationPolicy impl, not RuleEvaluator"
+    file: workorder-service/.../workflow/SeverityEscalationPolicy.java
+  - symbol: SlaEscalationPolicy.evaluate
+    reason: "EscalationPolicy impl, not RuleEvaluator"
+    file: workorder-service/.../workflow/SlaEscalationPolicy.java
+  - symbol: WorkOrderStatisticsService.evaluate
+    reason: "Independent class, not RuleEvaluator"
+    file: workorder-service/.../service/WorkOrderStatisticsService.java
+
+  # ops-gateway-service (4)
+  - symbol: DashboardHealthEvaluator.evaluate
+    reason: "Independent class in ops-gateway-service"
+    file: ops-gateway-service/.../service/DashboardHealthEvaluator.java
+  - symbol: DeviceHealthEvaluator.evaluate
+    reason: "Independent class, not RuleEvaluator"
+    file: ops-gateway-service/.../service/DeviceHealthEvaluator.java
+  - symbol: RegionHealthEvaluator.evaluate
+    reason: "Independent class, not RuleEvaluator"
+    file: ops-gateway-service/.../service/RegionHealthEvaluator.java
+  - symbol: ServiceHealthEvaluator.evaluate
+    reason: "Independent class, not RuleEvaluator"
+    file: ops-gateway-service/.../service/ServiceHealthEvaluator.java
+
+  # dispatch-service (5)
+  - symbol: DispatchRule.evaluate
+    reason: "DispatchRule interface, not RuleEvaluator"
+    file: dispatch-service/.../rule/DispatchRule.java
+  - symbol: SkillMatchRule.evaluate
+    reason: "DispatchRule impl, not RuleEvaluator"
+    file: dispatch-service/.../rule/SkillMatchRule.java
+  - symbol: LoadBalanceRule.evaluate
+    reason: "DispatchRule impl, not RuleEvaluator"
+    file: dispatch-service/.../rule/LoadBalanceRule.java
+  - symbol: ProximityRule.evaluate
+    reason: "DispatchRule impl, not RuleEvaluator"
+    file: dispatch-service/.../rule/ProximityRule.java
+  - symbol: PriorityOverrideRule.evaluate
+    reason: "DispatchRule impl, not RuleEvaluator"
+    file: dispatch-service/.../rule/PriorityOverrideRule.java
+
+  # vendor-collaboration-service (4)
+  - symbol: VendorEvaluator.evaluate
+    reason: "VendorEvaluator interface, not RuleEvaluator"
+    file: vendor-collaboration-service/.../evaluation/VendorEvaluator.java
+  - symbol: ResponseTimeVendorEvaluator.evaluate
+    reason: "VendorEvaluator impl, not RuleEvaluator"
+    file: vendor-collaboration-service/.../evaluation/ResponseTimeVendorEvaluator.java
+  - symbol: ResolutionRateVendorEvaluator.evaluate
+    reason: "VendorEvaluator impl, not RuleEvaluator"
+    file: vendor-collaboration-service/.../evaluation/ResolutionRateVendorEvaluator.java
+  - symbol: QualityScoreVendorEvaluator.evaluate
+    reason: "VendorEvaluator impl, not RuleEvaluator"
+    file: vendor-collaboration-service/.../evaluation/QualityScoreVendorEvaluator.java
+
+  # device-lifecycle-service (2)
+  - symbol: DeviceDeprecationPolicy.evaluate
+    reason: "Independent policy class, not RuleEvaluator"
+    file: device-lifecycle-service/.../policy/DeviceDeprecationPolicy.java
+  - symbol: CertificateRotationPolicy.evaluate
+    reason: "Independent policy class, not RuleEvaluator"
+    file: device-lifecycle-service/.../policy/CertificateRotationPolicy.java
+
+  # sla-engine-service (2)
+  - symbol: SlaBreachPolicy.evaluate
+    reason: "SLA breach policy, not RuleEvaluator"
+    file: sla-engine-service/.../monitor/SlaBreachPolicy.java
+  - symbol: SlaMonitoringService.evaluate
+    reason: "SLA monitoring service, not RuleEvaluator"
+    file: sla-engine-service/.../service/SlaMonitoringService.java
+
+  # notification-service (1)
+  - symbol: NotificationRuleService.evaluate
+    reason: "Notification rule evaluation, not RuleEvaluator"
+    file: notification-service/.../service/NotificationRuleService.java
+
+risk_justification: >
+  HIGH risk — 5 个目标实现 + 2 个核心调用方 + 5 个测试类受直接影响。
+  全项目共有 33+ 个 evaluate 方法，grep-only 策略在 50K 规模下
+  误报率极高。必须通过接口类型识别（RuleEvaluator vs 其他接口或无接口）
+  来精确区分目标。
+
+verification:
+  - mvn -pl alarm-engine-service test
+  - mvn test

@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gitnexus.dev/schemas/ai-coding-benchmark/run-result.schema.json",
+  "title": "AI Coding Benchmark Run Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "case_id",
+    "run_id",
+    "agent",
+    "tool_policy",
+    "policy_enforced",
+    "started_at",
+    "ended_at",
+    "status",
+    "final_answer",
+    "evidence",
+    "metrics",
+    "violations"
+  ],
+  "properties": {
+    "case_id": {
+      "type": "string"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "agent": {
+      "type": "string",
+      "enum": ["claude-code", "opencode"]
+    },
+    "agent_model": {
+      "type": "string"
+    },
+    "tool_policy": {
+      "type": "string",
+      "enum": ["grep", "graph", "mixed"]
+    },
+    "policy_enforced": {
+      "type": "boolean"
+    },
+    "target_repo": {
+      "type": "string"
+    },
+    "target_commit": {
+      "type": "string"
+    },
+    "gitnexus_index": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repo": { "type": "string" },
+        "indexed_at": { "type": "string" },
+        "symbols": { "type": "integer", "minimum": 0 },
+        "relationships": { "type": "integer", "minimum": 0 },
+        "execution_flows": { "type": "integer", "minimum": 0 },
+        "status": { "type": "string" }
+      }
+    },
+    "started_at": {
+      "type": "string"
+    },
+    "ended_at": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["passed", "failed", "partial", "invalid", "error"]
+    },
+    "final_answer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary"],
+      "properties": {
+        "summary": { "type": "string" },
+        "entrypoints": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidenceRef" }
+        },
+        "symbols": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidenceRef" }
+        },
+        "files": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "call_chains": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/evidenceRef" }
+          }
+        },
+        "data_flows": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/evidenceRef" }
+          }
+        },
+        "impact": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidenceRef" }
+        },
+        "risks": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "recommended_tests": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "diff_summary": {
+          "type": "string"
+        },
+        "validation_summary": {
+          "type": "string"
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidenceRef" }
+    },
+    "tool_calls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tool", "purpose"],
+        "properties": {
+          "tool": { "type": "string" },
+          "purpose": { "type": "string" },
+          "input_summary": { "type": "string" },
+          "output_summary": { "type": "string" },
+          "allowed_by_policy": { "type": "boolean" }
+        }
+      }
+    },
+    "validation": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command", "exit_code"],
+        "properties": {
+          "command": { "type": "string" },
+          "exit_code": { "type": "integer" },
+          "stdout_summary": { "type": "string" },
+          "stderr_summary": { "type": "string" }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool_call_count", "files_read_count"],
+      "properties": {
+        "tool_call_count": { "type": "integer", "minimum": 0 },
+        "files_read_count": { "type": "integer", "minimum": 0 },
+        "search_query_count": { "type": "integer", "minimum": 0 },
+        "graph_query_count": { "type": "integer", "minimum": 0 },
+        "elapsed_ms": { "type": "integer", "minimum": 0 },
+        "input_tokens": { "type": "integer", "minimum": 0 },
+        "output_tokens": { "type": "integer", "minimum": 0 },
+        "approx_context_chars": { "type": "integer", "minimum": 0 },
+        "changed_files_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "violations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "description"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["tool_policy", "context_leak", "dirty_worktree", "schema", "other"]
+          },
+          "description": { "type": "string" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "reason"],
+      "properties": {
+        "name": { "type": "string" },
+        "kind": {
+          "type": "string",
+          "enum": ["file", "class", "interface", "function", "method", "field", "endpoint", "flow", "test", "risk", "other"]
+        },
+        "file": { "type": "string" },
+        "symbol": { "type": "string" },
+        "line": { "type": "integer", "minimum": 0 },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}

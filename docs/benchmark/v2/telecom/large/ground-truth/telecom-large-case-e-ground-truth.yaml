@@ -1,0 +1,63 @@
+case_id: telecom-large-case-e-sla-calculator-impact
+task_type: impact_analysis
+
+target:
+  symbol: SlaCalculator.calculate
+  file: sla-engine-service/src/main/java/com/example/telecom/sla/calculator/SlaCalculator.java
+  current_signature: "SlaCalculationResult calculate(SlaContract contract, List<SlaMetricSnapshot> metrics)"
+  proposed_signature: "SlaCalculationResult calculate(SlaContract contract, List<SlaMetricSnapshot> metrics, SlaCalculationContext context)"
+  graph_risk: HIGH
+  graph_blast_radius:
+    direct_callers: 5
+    total_impacted_with_depth_4: 19
+    affected_process_groups: 3
+
+expected_symbols:
+  - symbol: SlaAvailabilityCalculator.calculate
+    file: sla-engine-service/.../calculator/SlaAvailabilityCalculator.java
+    reason: Availability metric implementation of SlaCalculator.calculate.
+  - symbol: SlaResolutionTimeCalculator.calculate
+    file: sla-engine-service/.../calculator/SlaResolutionTimeCalculator.java
+    reason: Resolution time implementation of SlaCalculator.calculate.
+  - symbol: SlaResponseTimeCalculator.calculate
+    file: sla-engine-service/.../calculator/SlaResponseTimeCalculator.java
+    reason: Response time implementation of SlaCalculator.calculate.
+  - symbol: SlaTimeCalculator.calculate
+    file: sla-engine-service/.../calculator/SlaTimeCalculator.java
+    reason: Generic time-based implementation of SlaCalculator.calculate.
+  - symbol: SlaCalculatorRegistry.calculateAll
+    file: sla-engine-service/.../calculator/SlaCalculatorRegistry.java
+    reason: Iterates registered SlaCalculator values and invokes calculate(contract, metrics).
+
+indirect_entrypoints:
+  - symbol: SlaMonitor.evaluateMetrics
+    chain: "SlaMonitor.evaluateMetrics -> SlaCalculatorRegistry.calculateAll -> SlaCalculator.calculate"
+    file: sla-engine-service/.../monitor/SlaMonitor.java
+  - symbol: SlaMonitoringService.monitor
+    chain: "SlaMonitoringService.monitor -> SlaMonitor.evaluateMetrics -> SlaCalculator.calculate"
+    file: sla-engine-service/.../service/SlaMonitoringService.java
+  - symbol: SlaMonitorController.checkContract
+    chain: "HTTP -> SlaMonitorController.checkContract -> SlaMonitoringService -> SlaCalculator.calculate"
+    file: sla-engine-service/.../controller/SlaMonitorController.java
+  - symbol: SlaMonitorController.manualCheck
+    chain: "HTTP -> SlaMonitorController.manualCheck -> SlaMonitoringService.checkAllContracts -> SlaCalculator.calculate"
+    file: sla-engine-service/.../controller/SlaMonitorController.java
+
+must_mention:
+  - Four SlaCalculator implementations must be identified.
+  - SlaCalculatorRegistry.calculateAll is the direct interface-typed caller.
+  - SlaMonitor and SlaMonitoringService are the monitoring layer; two Controller endpoints are the HTTP entry.
+  - Context propagation must cover both single-contract checkContract and all-contract manualCheck paths.
+  - The registry is mutable through register/unregister/resolve; custom calculators must follow the new contract.
+
+must_exclude_from_impact:
+  - symbol: DispatchScoringService.calculateScore
+    reason: Dispatch scoring in a different module.
+  - symbol: SlaBreachPolicy.evaluate
+    reason: Breach decision policy, not SlaCalculator.
+  - symbol: WorkOrderSlaService
+    reason: Work-order SLA consumer unless it calls the exact calculator contract.
+
+recommended_validation:
+  - mvn -pl sla-engine-service test
+  - mvn test

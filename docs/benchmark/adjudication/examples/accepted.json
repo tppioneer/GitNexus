@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "benchmark_version": "v3",
+  "case_id": "case-a",
+  "run_id": "case-a__claude-code__graph__r1",
+  "agent": "claude-code",
+  "tool_policy": "graph",
+  "sources": {
+    "agent_result": {"path": "agent-result.json", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    "automatic_score": {"path": "score.json", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"},
+    "ground_truth": {"path": "ground-truth.yaml", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"}
+  },
+  "review": {
+    "status": "completed",
+    "outcome": "accepted",
+    "mode": "human_approved_agent_assisted",
+    "prepared_by": {"type": "agent", "agent": "codex"},
+    "approved_by": {"type": "human", "reviewer_id": "maintainer", "approved_at": "2026-07-12T10:00:00Z", "approval_note": "Automatic score accepted in conversation."},
+    "rubric_version": "human-adjudication-v1"
+  },
+  "baseline": {"dimensions": {"location": 15, "symbols": 20, "call_edges": 15, "behavior_facts": 20, "evidence": 10, "noise": 10}, "total": 90},
+  "decisions": [],
+  "result": {"dimensions": {"location": 15, "symbols": 20, "call_edges": 15, "behavior_facts": 20, "evidence": 10, "noise": 10}, "automatic_total": 90, "adjudicated_total": 90, "delta": 0, "effective_total": 90}
+}
+

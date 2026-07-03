@@ -1,0 +1,57 @@
+case_id: qwenpaw-case-f-control-command-handler-impact
+task_type: impact_analysis
+
+target:
+  symbol: BaseControlCommandHandler.handle
+  file: src/qwenpaw/app/runner/control_commands/base.py
+  current_signature: "handle(self, context)"
+  proposed_signature: "handle(self, context, execution_meta)"
+  graph_risk: MEDIUM
+  graph_direct_overrides: 7
+
+expected_implementations:
+  - symbol: StopCommandHandler.handle
+    file: src/qwenpaw/app/runner/control_commands/stop_handler.py
+  - symbol: SkillsCommandHandler.handle
+    file: src/qwenpaw/app/runner/control_commands/skills_handler.py
+  - symbol: ModelCommandHandler.handle
+    file: src/qwenpaw/app/runner/control_commands/model_handler.py
+  - symbol: ApprovalCommandHandler.handle
+    file: src/qwenpaw/app/runner/control_commands/approval_handler.py
+  - symbol: ApproveCommandHandler.handle
+    file: src/qwenpaw/app/runner/control_commands/approval_handler.py
+  - symbol: DenyCommandHandler.handle
+    file: src/qwenpaw/app/runner/control_commands/approval_handler.py
+  - symbol: A2AListCommandHandler.handle
+    file: plugins/bundle/cloudpaw/tools/a2a_command.py
+    reason: Bundled plugin implementation outside src/qwenpaw; easy to miss with a package-only scan.
+
+dispatch_path:
+  - symbol: register_command
+    file: src/qwenpaw/app/runner/control_commands/__init__.py
+    reason: Stores BaseControlCommandHandler instances in _COMMAND_REGISTRY.
+  - symbol: handle_control_command
+    file: src/qwenpaw/app/runner/control_commands/__init__.py
+    reason: Resolves the command, builds ControlContext, and awaits handler.handle(context).
+  - symbol: _COMMAND_REGISTRY
+    file: src/qwenpaw/app/runner/control_commands/__init__.py
+    reason: Polymorphic dispatch point that must pass execution_meta after the contract change.
+
+must_exclude_from_impact:
+  - symbol: ConversationRelay.handle
+    reason: Voice channel handler, does not inherit BaseControlCommandHandler.
+  - symbol: tool_guard.handle
+    reason: WeCom card tool guard handler, does not inherit BaseControlCommandHandler.
+  - symbol: BaseChannel.build_agent_request_from_native
+    reason: Channel message adapter, unrelated to control command dispatch.
+  - symbol: BaseChannel.send
+    reason: Channel message sending, unrelated to control command dispatch.
+
+must_mention:
+  - The CloudPaw A2A handler is part of the impact even though it lives under plugins/bundle.
+  - Registration is instance-based and dispatch calls through the BaseControlCommandHandler type.
+  - ApprovalCommandHandler, ApproveCommandHandler, and DenyCommandHandler are three distinct implementations in one file.
+
+recommended_validation:
+  - python -m pytest
+  - targeted dispatch tests for stop, model, skills, approval/approve/deny, and the CloudPaw A2A command

@@ -1,0 +1,39 @@
+id: telecom-case-j-spring-di-selection
+name: Telecom Spring DI bean selection under fixed profile
+level: L2
+task_type: framework_dispatch
+repo: telecom-ops-platform
+status: draft-ground-truth
+
+prompt: |
+  请分析 network-change-service 中 ChangeExecutionService 构造器注入的各参数在 benchmark profile 下的候选 bean 和最终选择。
+  需要覆盖：
+  - @Qualifier("safeExecutor") ChangeExecutor safeExecutor 的选择；
+  - @ChangeExecutorCandidate List<ChangeExecutor> executors 的候选集；
+  - Map<String, ChangeExecutor> executorBeans 包含的 bean 名和实现；
+  - ObjectProvider<RollbackHandler> rollbackHandlerProvider 的可用候选；
+  - DefaultExecutorFacade 中无 qualifier 的 ChangeExecutor 注入如何由 @Primary 决定；
+  - LegacyChangeFacade 中 @Qualifier("routerExecutor") field injection 的选择；
+  - @Profile("dry-run") 和 @ConditionalOnProperty 在 benchmark 与 dry-run 两种 profile 下对候选集的影响。
+  不要把所有 ChangeExecutor 实现都标为唯一 runtime target。
+
+graph_queries:
+  - 'context({name: "ChangeExecutionService"})'
+  - 'context({name: "ChangeExecutor"})'
+  - 'context({name: "ChangeExecutorRegistry"})'
+
+grep_searches:
+  - rg "@Primary|@Qualifier|@Profile|@ConditionalOnProperty|@ChangeExecutorCandidate"
+  - rg "implements ChangeExecutor|extends AbstractChangeExecutor"
+
+ground_truth: docs/benchmark/v2/telecom/ground-truth/telecom-case-j-ground-truth.yaml
+
+risk_level: MEDIUM
+
+scoring:
+  must_identify:
+    - qualifier/primary/profile/collection 选择
+    - 条件 bean 激活状态
+    - benchmark 与 dry-run profile 差异
+  must_exclude:
+    - 非 ChangeExecutor 类型的 execute 方法

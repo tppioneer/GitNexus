@@ -1,0 +1,43 @@
+id: telecom-case-h-spring-route-matrix
+name: Telecom network-change-service Spring MVC route matrix
+level: L2
+task_type: structure_extraction
+repo: telecom-ops-platform
+status: draft-ground-truth
+
+prompt: |
+  请列出 network-change-service 模块中所有 Controller 暴露的 HTTP route，包括 HTTP method、完整路径和 handler 方法。
+  需要正确处理以下场景：
+  - 类级 @RequestMapping 前缀与方法级注解的组合；
+  - 快捷注解（@GetMapping、@PostMapping、@PutMapping、@PatchMapping、@DeleteMapping）；
+  - 方法级 @RequestMapping（含任意 method 和显式 method=RequestMethod.GET 两种写法）；
+  - 数组路径（一个方法映射到多个 URL）；
+  - 组合注解 @OpsReadEndpoint 与实际 @GetMapping 的共同使用；
+  - 全限定注解名 @org.springframework.web.bind.annotation.GetMapping；
+  - 常量路径 ChangeRoutes.PENDING；
+  - 方法级 @GetMapping 无路径时回退到类前缀。
+  不要修改代码，只输出路由清单及每条路由的解析依据。
+
+graph_queries:
+  - 'context({name: "NetworkChangeController"})'
+  - 'context({name: "LegacyNetworkChangeController"})'
+  - 'context({name: "ComposedEndpointController"})'
+
+grep_searches:
+  - rg "@GetMapping|@PostMapping|@PutMapping|@PatchMapping|@DeleteMapping|@RequestMapping"
+  - rg "@RestController|@Controller"
+  - rg "ChangeRoutes\."
+
+ground_truth: docs/benchmark/v2/telecom/ground-truth/telecom-case-h-ground-truth.yaml
+
+risk_level: LOW
+
+scoring:
+  must_identify:
+    - R01-R12 全部 13 条 route（R08 展开为 2 条）
+    - 3 个 Controller 类
+    - 类级前缀组合和常量路径解析
+  must_exclude:
+    - ChangeDocumentation 中的字符串
+    - ChangeRoutes.DRAFT 和 ChangeRoutes.ARCHIVED
+    - 日志消息中的 /api/network-changes/fake

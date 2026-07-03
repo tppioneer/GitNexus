@@ -1,0 +1,101 @@
+case_id: qwenpaw-case-u-console-chat-stream-flow
+task_type: flow_tracing
+ground_truth_status: reviewed
+
+expected_routes:
+  - id: route.console-chat
+    method: POST
+    path: /console/chat
+    handler: post_console_chat
+  - id: route.console-chat-stop
+    method: POST
+    path: /console/chat/stop
+    handler: post_console_chat_stop
+
+expected_entrypoints:
+  - id: entry.console-chat
+    symbol: post_console_chat
+    file: src/qwenpaw/app/routers/console.py
+    reason: Parses the request and returns StreamingResponse.
+  - id: entry.console-chat-stop
+    symbol: post_console_chat_stop
+    file: src/qwenpaw/app/routers/console.py
+    reason: Explicit cancellation entrypoint.
+
+expected_symbols:
+  - id: symbol.extract-session-payload
+    symbol: _extract_session_and_payload
+    file: src/qwenpaw/app/routers/console.py
+  - id: symbol.chat-manager-get-or-create
+    symbol: ChatManager.get_or_create_chat
+    file: src/qwenpaw/app/runner/manager.py
+  - id: symbol.task-tracker-attach-or-start
+    symbol: TaskTracker.attach_or_start
+    file: src/qwenpaw/app/runner/task_tracker.py
+  - id: symbol.console-channel-stream-one
+    symbol: ConsoleChannel.stream_one
+    file: src/qwenpaw/app/channels/console/channel.py
+  - id: symbol.agent-runner-query-handler
+    symbol: AgentRunner.query_handler
+    file: src/qwenpaw/app/runner/runner.py
+  - id: symbol.task-tracker-stream-from-queue
+    symbol: TaskTracker.stream_from_queue
+    file: src/qwenpaw/app/runner/task_tracker.py
+  - id: symbol.task-tracker-request-stop
+    symbol: TaskTracker.request_stop
+    file: src/qwenpaw/app/runner/task_tracker.py
+
+expected_edges:
+  - id: edge.chat-handler-to-manager
+    from: post_console_chat
+    to: ChatManager.get_or_create_chat
+    relation: calls
+  - id: edge.manager-to-tracker
+    from: ChatManager.get_or_create_chat
+    to: TaskTracker.attach_or_start
+    relation: calls
+  - id: edge.tracker-to-console-stream
+    from: TaskTracker.attach_or_start
+    to: ConsoleChannel.stream_one
+    relation: schedules
+  - id: edge.console-stream-to-query
+    from: ConsoleChannel.stream_one
+    to: AgentRunner.query_handler
+    relation: delegates
+  - id: edge.event-generator-to-queue
+    from: event_generator
+    to: TaskTracker.stream_from_queue
+    relation: delegates
+  - id: edge.queue-to-streaming-response
+    from: TaskTracker.stream_from_queue
+    to: StreamingResponse
+    relation: feeds
+  - id: edge.reconnect-to-attach
+    from: post_console_chat
+    to: TaskTracker.attach
+    relation: calls
+    control_context: reconnect
+  - id: edge.stop-handler-to-request-stop
+    from: post_console_chat_stop
+    to: TaskTracker.request_stop
+    relation: calls
+
+expected_facts:
+  - id: fact.disconnect-keeps-background-run
+    description: Browser disconnect closes only the subscriber iterator; the tracked background run continues.
+  - id: fact.chat-id-is-run-key
+    description: chat.id, not the external session_id, is the primary run_key; the stop endpoint contains a session-to-chat fallback.
+  - id: fact.generator-finally-detaches
+    description: The SSE generator explicitly closes the iterator in finally so subscriber state is detached.
+  - id: fact.reconnect-does-not-duplicate-run
+    description: Reconnect does not start a second agent run when the tracker still has the chat.
+
+noise_items:
+  - id: noise.console-upload
+    symbol: post_console_upload
+  - id: noise.push-messages
+    symbol: get_push_messages
+
+recommended_validation:
+  - python -m pytest tests/unit/channels/test_console.py tests/contract/channels/test_console_contract.py
+

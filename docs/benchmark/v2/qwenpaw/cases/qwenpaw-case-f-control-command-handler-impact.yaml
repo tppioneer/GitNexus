@@ -1,0 +1,14 @@
+id: qwenpaw-case-f-control-command-handler-impact
+name: QwenPaw control-command handler contract impact
+level: L2
+task_type: impact_analysis
+repo: QwenPaw
+status: draft-ground-truth
+
+prompt: |
+  请分析如果给 BaseControlCommandHandler.handle(context) 增加一个必填的
+  execution_meta 参数，需要同步修改哪些 handler、注册/分发路径、内置插件和测试。
+  要精确区分真正继承 BaseControlCommandHandler 的 handle override，
+  不要把 channel、HTTP handler 或其他普通 handle 方法纳入影响面。
+  不要修改代码，只输出完整影响分析、跨插件风险和验证建议。
+

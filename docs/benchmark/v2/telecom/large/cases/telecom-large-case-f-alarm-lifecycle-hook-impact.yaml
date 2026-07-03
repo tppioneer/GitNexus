@@ -1,0 +1,38 @@
+id: telecom-large-case-f-alarm-lifecycle-hook-impact
+name: Telecom Large AlarmLifecycleHook.process 签名与可达性分析
+level: L2
+task_type: impact_analysis
+repo: telecom-ops-platform-large
+status: draft-ground-truth
+
+prompt: |
+  AlarmLifecycleHook.process 由 Registry 按注册顺序分发给各 hook 实现。
+  我们需要增加一个 AlarmLifecycleContext 参数，用于在 hook 间传递告警处理上下文
+  （如当前处理阶段、是否已触发升级等）。
+
+  请分析这个签名变更会影响哪些 AlarmLifecycleHook 实现、AlarmHookRegistry 和受影响的测试。
+  同时请确认 AlarmHookRegistry.executeHooks 当前是否真正被生产代码调用，
+  不要仅因为存在类和测试就认为 hook 已接入告警主流程。
+  不要修改代码，只输出证据、影响面、风险和验证建议。
+
+graph_queries:
+  - 'context({name: "AlarmLifecycleHook"})'
+  - 'impact({target: "process", direction: "upstream"})'
+  - 'context({name: "AlarmHookRegistry"})'
+
+grep_searches:
+  - rg "AlarmLifecycleHook|AlarmHookRegistry|executeHooks|process\("
+  - rg "new AlarmHookRegistry|\.executeHooks\(" alarm-engine-service/src
+
+
+ground_truth: docs/benchmark/v2/telecom/large/ground-truth/telecom-large-case-f-ground-truth.yaml
+
+risk_level: LOW
+
+scoring:
+  must_identify:
+    - 3 个真实 AlarmLifecycleHook 实现
+    - AlarmHookRegistry.executeHooks 是唯一接口型调用点
+    - Registry 按注册顺序执行且单个 hook 异常不会中断后续 hook
+    - 当前 executeHooks 只有测试调用，没有生产调用者
+    - AlarmHookRegistryTest 与 AlarmLifecycleHookTest

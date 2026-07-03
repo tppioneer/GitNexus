@@ -1,0 +1,148 @@
+case_id: telecom-case-k-transaction-boundary
+task_type: framework_semantics
+truth_version: '2.1'
+ground_truth_status: draft
+expected_entrypoints:
+- id: ep.change-plan-service
+  symbol: ChangePlanService
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangePlanService.java
+- id: ep.change-audit-service
+  symbol: ChangeAuditService
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeAuditService.java
+expected_symbols:
+- id: sym.change-plan-query-service
+  symbol: ChangePlanQueryService
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangePlanQueryService.java
+- id: sym.change-execution-service
+  symbol: ChangeExecutionService
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeExecutionService.java
+expected_facts:
+- id: fact.create-plan-tx
+  description: ChangePlanService.createPlan has @Transactional with default REQUIRED propagation, not readOnly
+- id: fact.find-by-id-readonly
+  description: ChangePlanQueryService.findById has @Transactional(readOnly=true)
+- id: fact.record-requires-new
+  description: ChangeAuditService.record has @Transactional(propagation=REQUIRES_NEW) creating a new transaction when called through proxy
+- id: fact.class-level-tx
+  description: ChangeExecutionService has class-level @Transactional inherited by all public methods
+- id: fact.preview-no-tx
+  description: ChangePlanService.preview has no @Transactional annotation — negative example
+- id: fact.self-invocation-trap
+  description: approveAndRecordInternally calls recordInternal via self-invocation (this.recordInternal) bypassing Spring proxy so REQUIRES_NEW has no effect
+- id: fact.cross-bean-requires-new
+  description: recordInternal calls ChangeAuditService.record across beans through proxy so REQUIRES_NEW creates a new transaction
+transactional_methods:
+- id: tx.create-plan
+  method: ChangePlanService.createPlan
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangePlanService.java
+  annotation: '@Transactional'
+  propagation: REQUIRED
+  readOnly: false
+  description: Standard write transaction
+- id: tx.approve-and-record
+  method: ChangePlanService.approveAndRecordInternally
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangePlanService.java
+  annotation: '@Transactional'
+  propagation: REQUIRED
+  readOnly: false
+  description: Standard write transaction — caller of self-invocation trap
+- id: tx.record-internal
+  method: ChangePlanService.recordInternal
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangePlanService.java
+  annotation: '@Transactional(propagation = Propagation.REQUIRES_NEW)'
+  propagation: REQUIRES_NEW
+  readOnly: false
+  self_invocation_trap: true
+  description: 'Has REQUIRES_NEW annotation, but when called from approveAndRecordInternally via this.recordInternal(), Spring proxy is NOT involved. The REQUIRES_NEW semantics are LOST. This is a plain
+    Java direct call within the same bean.
+
+    '
+- id: tx.find-by-id
+  method: ChangePlanQueryService.findById
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangePlanQueryService.java
+  annotation: '@Transactional(readOnly = true)'
+  propagation: REQUIRED
+  readOnly: true
+  description: Read-only transaction
+- id: tx.find-all
+  method: ChangePlanQueryService.findAll
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangePlanQueryService.java
+  annotation: '@Transactional(readOnly = true)'
+  propagation: REQUIRED
+  readOnly: true
+  description: Read-only transaction
+- id: tx.audit-record
+  method: ChangeAuditService.record
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeAuditService.java
+  annotation: '@Transactional(propagation = Propagation.REQUIRES_NEW)'
+  propagation: REQUIRES_NEW
+  readOnly: false
+  description: Each call gets its own transaction when invoked through Spring proxy
+- id: tx.audit-find-by-action
+  method: ChangeAuditService.findByAction
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeAuditService.java
+  annotation: '@Transactional(readOnly = true)'
+  propagation: REQUIRED
+  readOnly: true
+  description: Read-only transaction
+- id: tx.execution-service-class
+  class_level: ChangeExecutionService
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeExecutionService.java
+  annotation: '@Transactional'
+  level: class
+  propagation: REQUIRED
+  readOnly: false
+  description: Class-level @Transactional inherited by all public methods unless overridden
+non_transactional_methods:
+- method: ChangePlanService.preview
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangePlanService.java
+  annotation: null
+  description: Negative example — no @Transactional annotation
+self_invocation_analysis:
+  caller: ChangePlanService.approveAndRecordInternally
+  callee: ChangePlanService.recordInternal
+  call_type: Java direct call (this.recordInternal())
+  proxy_crossed: false
+  reQUIRES_NEW_effective: false
+  explanation: 'approveAndRecordInternally and recordInternal are in the same class (ChangePlanService). The call this.recordInternal() is a plain Java method invocation that does NOT go through the Spring
+    AOP proxy. Even though recordInternal has @Transactional(propagation=REQUIRES_NEW), the new-transaction semantics only apply when the method is called through the proxy. Tools that only detect annotation
+    presence without analyzing proxy boundaries would incorrectly claim REQUIRES_NEW takes effect.
+
+    '
+call_chains:
+- chain: HTTP -> ChangePlanService.approveAndRecordInternally -> this.approve -> snapshotStore.save
+  transaction: Single transaction from approveAndRecordInternally's @Transactional
+- chain: HTTP -> ChangePlanService.approveAndRecordInternally -> this.recordInternal -> auditService.record
+  transaction: Same transaction as caller — REQUIRES_NEW is NOT effective due to self-invocation
+- chain: HTTP -> ChangeAuditService.record (direct call through proxy)
+  transaction: New REQUIRES_NEW transaction — proxy IS involved
+noise_items:
+- id: noise.k-faketransactionalmarker-0
+  symbol: FakeTransactionalMarker
+  file: network-change-service/src/main/java/com/example/telecom/change/service/FakeTransactionalMarker.java
+  reason: Name contains 'Transactional' but is not a Spring annotation
+test_class:
+  name: CaseKTransactionBoundaryTest
+  file: network-change-service/src/test/java/com/example/telecom/change/service/CaseKTransactionBoundaryTest.java
+  methods:
+  - changePlanService_createPlan_hasTransactional
+  - changePlanQueryService_findById_isReadOnly
+  - changeAuditService_record_requiresNew
+  - changeExecutionService_hasClassLevelTransactional
+  - changePlanService_preview_hasNoTransactional
+  - recordInternal_hasRequiresNew_but_selfInvocation_bypassesProxy
+  - approve_hasCriticalChange_whichBringsAuditOperation
+recommended_validation:
+- mvn -pl network-change-service -am test -Dtest=CaseKTransactionBoundaryTest
+source_commit: 5c2fdcdf9e3b7829fc8ace183e2b0876ccbb188a
+source_dirty: true
+source_scope_clean: true
+source_project: telecom-ops-platform
+source_module: network-change-service
+reviewed_at: '2026-07-20'
+analysis_scope: src/main/java only
+dimension_weights:
+  transaction_semantics: 40
+  symbols: 20
+  facts: 30
+  noise: 10

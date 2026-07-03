@@ -1,0 +1,284 @@
+annotation_types:
+- elements:
+  - has_default: false
+    name: action
+    type: String
+  - has_default: false
+    name: category
+    type: AuditCategory
+  - default_value: false
+    has_default: true
+    name: sensitive
+    type: boolean
+  file: network-change-service/src/main/java/com/example/telecom/change/annotation/AuditOperation.java
+  fqn: com.example.telecom.change.annotation.AuditOperation
+  name: AuditOperation
+  retention: RUNTIME
+  target:
+  - METHOD
+  - ANNOTATION_TYPE
+- elements:
+  - default_value: LOW
+    has_default: true
+    name: risk
+    type: ChangeRisk
+  - default_value: false
+    has_default: true
+    name: requireApproval
+    type: boolean
+  file: network-change-service/src/main/java/com/example/telecom/change/annotation/ChangeGuard.java
+  fqn: com.example.telecom.change.annotation.ChangeGuard
+  name: ChangeGuard
+  retention: RUNTIME
+  target:
+  - METHOD
+  - TYPE
+  - ANNOTATION_TYPE
+- elements:
+  - has_default: false
+    name: value
+    type: String
+  - default_value: false
+    has_default: true
+    name: includeChildren
+    type: boolean
+  file: network-change-service/src/main/java/com/example/telecom/change/annotation/RegionScope.java
+  fqn: com.example.telecom.change.annotation.RegionScope
+  name: RegionScope
+  retention: RUNTIME
+  target:
+  - METHOD
+  - PARAMETER
+  - TYPE_USE
+- container: RequiredCapabilities
+  elements:
+  - has_default: false
+    name: value
+    type: String
+  file: network-change-service/src/main/java/com/example/telecom/change/annotation/RequiredCapability.java
+  fqn: com.example.telecom.change.annotation.RequiredCapability
+  name: RequiredCapability
+  repeatable: true
+  retention: RUNTIME
+  target:
+  - TYPE
+  - METHOD
+- container_for: RequiredCapability
+  elements:
+  - has_default: false
+    name: value
+    type: RequiredCapability[]
+  file: network-change-service/src/main/java/com/example/telecom/change/annotation/RequiredCapabilities.java
+  fqn: com.example.telecom.change.annotation.RequiredCapabilities
+  name: RequiredCapabilities
+  retention: RUNTIME
+  target:
+  - TYPE
+  - METHOD
+- file: network-change-service/src/main/java/com/example/telecom/change/annotation/CriticalChange.java
+  fqn: com.example.telecom.change.annotation.CriticalChange
+  meta_annotations:
+  - annotation: AuditOperation
+    elements:
+      action: critical-change
+      category: AuditCategory.CHANGE
+      sensitive: true
+  - annotation: ChangeGuard
+    elements:
+      requireApproval: true
+      risk: ChangeRisk.CRITICAL
+  name: CriticalChange
+  retention: RUNTIME
+  target:
+  - METHOD
+- elements:
+  - default_value: '{}'
+    has_default: true
+    name: path
+    type: String[]
+  file: network-change-service/src/main/java/com/example/telecom/change/annotation/OpsReadEndpoint.java
+  fqn: com.example.telecom.change.annotation.OpsReadEndpoint
+  name: OpsReadEndpoint
+  note: Marker annotation — not a Spring meta-mapping under Spring 6. Controllers apply both @OpsReadEndpoint and @GetMapping together.
+  retention: RUNTIME
+  target:
+  - METHOD
+- file: network-change-service/src/main/java/com/example/telecom/change/annotation/ChangeExecutorCandidate.java
+  fqn: com.example.telecom.change.annotation.ChangeExecutorCandidate
+  meta_annotations:
+  - annotation: org.springframework.beans.factory.annotation.Qualifier
+  name: ChangeExecutorCandidate
+  note: Custom Spring qualifier — restricts registry candidate set at injection time.
+  retention: RUNTIME
+  target:
+  - TYPE
+  - FIELD
+  - PARAMETER
+applications:
+- annotation: ChangeGuard
+  annotation_symbol: com.example.telecom.change.annotation.ChangeGuard
+  elements:
+    risk:
+      symbol: ChangeGuard.risk()
+      value: LOW
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangePlanService.java
+  id: app.plan-service-class-guard
+  target: ChangePlanService (class)
+- annotations:
+  - annotation: AuditOperation
+    elements:
+      action: create-plan
+      category: AuditCategory.CHANGE
+    sensitive_default: false
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangePlanService.java
+  id: i.applications.item-1
+  target: ChangePlanService.createPlan
+- annotations:
+  - annotation: CriticalChange
+    direct: true
+    meta_chain:
+    - AuditOperation(action="critical-change", category=CHANGE, sensitive=true)
+    - ChangeGuard(risk=CRITICAL, requireApproval=true)
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangePlanService.java
+  id: i.applications.item-2
+  target: ChangePlanService.approve
+- annotations:
+  - annotation: AuditOperation
+    elements:
+      action: update-risk
+      category: AuditCategory.CHANGE
+      sensitive: true
+    fqn_used: '@com.example.telecom.change.annotation.AuditOperation'
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangePlanService.java
+  id: i.applications.item-3
+  target: ChangePlanService.updateRisk
+- file: network-change-service/src/main/java/com/example/telecom/change/service/ChangePlanQueryService.java
+  id: i.applications.item-4
+  method_annotations:
+  - annotation: OpsReadEndpoint
+    elements:
+      path:
+      - /region-query
+  parameter_annotations:
+  - annotation: RegionScope
+    elements:
+      value: east
+    parameter: regionCode
+  target: ChangePlanQueryService.findByRegion
+- annotations:
+  - annotation: ChangeGuard
+    elements:
+      risk: ChangeRisk.MEDIUM
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeExecutionService.java
+  id: i.applications.item-5
+  target: ChangeExecutionService (class)
+- annotations:
+  - annotation: ChangeExecutorCandidate
+  file: network-change-service/src/main/java/com/example/telecom/change/executor/RouterChangeExecutor.java
+  id: i.applications.item-6
+  target: RouterChangeExecutor (class)
+- annotations:
+  - annotation: ChangeExecutorCandidate
+  file: network-change-service/src/main/java/com/example/telecom/change/executor/TransmissionChangeExecutor.java
+  id: i.applications.item-7
+  target: TransmissionChangeExecutor (class)
+- annotations:
+  - annotation: ChangeExecutorCandidate
+  file: network-change-service/src/main/java/com/example/telecom/change/executor/RadioChangeExecutor.java
+  id: i.applications.item-8
+  target: RadioChangeExecutor (class)
+- annotations:
+  - annotation: ChangeExecutorCandidate
+  file: network-change-service/src/main/java/com/example/telecom/change/executor/DryRunChangeExecutor.java
+  id: i.applications.item-9
+  target: DryRunChangeExecutor (class)
+- annotations: []
+  file: network-change-service/src/main/java/com/example/telecom/change/executor/SafeChangeExecutor.java
+  id: i.applications.item-10
+  note: Does NOT have @ChangeExecutorCandidate — excluded from registry candidate set
+  target: SafeChangeExecutor (class)
+case_id: telecom-case-i-java-annotation-binding
+expected_entrypoints:
+- file: network-change-service/src/main/java/com/example/telecom/change/service/ChangePlanService.java
+  id: ep.change-plan-service
+  symbol: ChangePlanService
+expected_facts:
+- description: AuditOperation targets METHOD and ANNOTATION_TYPE with RUNTIME retention
+  id: fact.audit-operation-targets
+- description: CriticalChange is meta-annotated with AuditOperation(action=critical-change, category=CHANGE, sensitive=true) and ChangeGuard(risk=CRITICAL, requireApproval=true)
+  id: fact.critical-change-meta-chain
+- description: RequiredCapability is @Repeatable with container RequiredCapabilities
+  id: fact.required-capability-repeatable
+- description: ChangeExecutorCandidate is meta-annotated with @Qualifier making it a custom Spring qualifier
+  id: fact.change-executor-candidate-qualifier
+- description: 'ChangePlanService class has two @RequiredCapability annotations: change.write and audit.log'
+  id: fact.change-plan-service-repeatable
+- description: ChangePlanService.updateRisk uses fully-qualified @com.example.telecom.change.annotation.AuditOperation with sensitive=true
+  id: fact.update-risk-fqn
+- description: ChangePlanQueryService.findByRegion has @RegionScope on the regionCode parameter
+  id: fact.region-scope-parameter
+expected_symbols:
+- file: network-change-service/src/main/java/com/example/telecom/change/annotation/AuditOperation.java
+  id: sym.audit-operation
+  symbol: AuditOperation
+- file: network-change-service/src/main/java/com/example/telecom/change/annotation/ChangeGuard.java
+  id: sym.change-guard
+  symbol: ChangeGuard
+- file: network-change-service/src/main/java/com/example/telecom/change/annotation/RegionScope.java
+  id: sym.region-scope
+  symbol: RegionScope
+- file: network-change-service/src/main/java/com/example/telecom/change/annotation/RequiredCapability.java
+  id: sym.required-capability
+  symbol: RequiredCapability
+- file: network-change-service/src/main/java/com/example/telecom/change/annotation/RequiredCapabilities.java
+  id: sym.required-capabilities
+  symbol: RequiredCapabilities
+- file: network-change-service/src/main/java/com/example/telecom/change/annotation/CriticalChange.java
+  id: sym.critical-change
+  symbol: CriticalChange
+- file: network-change-service/src/main/java/com/example/telecom/change/annotation/OpsReadEndpoint.java
+  id: sym.ops-read-endpoint
+  symbol: OpsReadEndpoint
+- file: network-change-service/src/main/java/com/example/telecom/change/annotation/ChangeExecutorCandidate.java
+  id: sym.change-executor-candidate
+  symbol: ChangeExecutorCandidate
+ground_truth_status: draft
+noise_items:
+- file: network-change-service/src/main/java/com/example/telecom/change/service/FakeTransactionalMarker.java
+  id: noise.i-faketransactionalmarker-0
+  reason: Name contains 'Transactional' but is not a Spring annotation
+  symbol: FakeTransactionalMarker
+recommended_validation:
+- mvn -pl network-change-service -am test -Dtest=CaseIAnnotationBindingTest,CaseIRepeatableAnnotationTest
+scoring_layers:
+- description: Can the tool find all 8 annotation type definitions?
+  layer: annotation_type_definition
+- description: Can the tool bind annotation applications to the correct type symbol (not just text match)?
+  layer: annotation_application_symbol
+- description: Can the tool bind action/category/sensitive values to the correct annotation element methods?
+  layer: annotation_element_binding
+- description: Does the tool recognize two @RequiredCapability as repeatable instances with container semantics?
+  layer: repeatable_annotation
+- description: Does the tool trace @CriticalChange → @AuditOperation + @ChangeGuard meta-annotation chain?
+  layer: meta_annotation
+- description: Does the tool distinguish annotation identification from Spring framework interpretation?
+  layer: framework_semantics
+task_type: symbol_navigation
+test_classes:
+- file: network-change-service/src/test/java/com/example/telecom/change/annotation/CaseIAnnotationBindingTest.java
+  name: CaseIAnnotationBindingTest
+- file: network-change-service/src/test/java/com/example/telecom/change/annotation/CaseIRepeatableAnnotationTest.java
+  name: CaseIRepeatableAnnotationTest
+truth_version: '2.1'
+source_commit: 5c2fdcdf9e3b7829fc8ace183e2b0876ccbb188a
+source_dirty: true
+source_scope_clean: true
+source_project: telecom-ops-platform
+source_module: network-change-service
+reviewed_at: '2026-07-20'
+analysis_scope: src/main/java only
+dimension_weights:
+  annotation_binding: 40
+  symbols: 25
+  facts: 25
+  noise: 10

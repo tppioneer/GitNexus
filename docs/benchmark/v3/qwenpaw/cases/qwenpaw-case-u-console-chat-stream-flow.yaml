@@ -1,0 +1,17 @@
+id: qwenpaw-case-u-console-chat-stream-flow
+name: QwenPaw console chat streaming execution flow
+level: L2
+task_type: flow_tracing
+repo: QwenPaw
+status: reviewed
+
+prompt: |
+  用户从 Web Console 发起一条新对话后，即使浏览器中途断开，后台任务仍应继续运行，并允许用户稍后重连到同一条输出流。
+  请从 HTTP 请求入口开始，分析这条消息如何建立会话、启动或复用后台任务、执行 agent 查询并通过 SSE 返回结果，同时说明断开、重连和主动停止分别如何处理。
+  不要修改代码，只输出有证据支持的完整执行链、关键状态边界、风险和验证建议。
+
+extra_desc: |
+  Case 设计与人工审阅提示，不进入模型公开载荷：核对 console router、session/chat identity、TaskTracker、ConsoleChannel、AgentRunner 和 SSE subscriber 清理；不要把普通文件上传或 push-message 轮询算入主链。
+
+ground_truth: docs/benchmark/v3/qwenpaw/ground-truth/qwenpaw-case-u-console-chat-stream-flow-ground-truth.yaml
+

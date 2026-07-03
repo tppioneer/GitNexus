@@ -1,0 +1,58 @@
+case_id: qwenpaw-case-w-token-usage-data-flow
+task_type: data_flow
+ground_truth_status: reviewed
+
+expected_entrypoints:
+  - symbol: TokenRecordingModelWrapper.__call__
+    file: src/qwenpaw/token_usage/model_wrapper.py
+    reason: Observes usage on both normal ChatResponse and completed async streams.
+
+expected_symbols:
+  - symbol: TokenRecordingModelWrapper._wrap_stream
+    file: src/qwenpaw/token_usage/model_wrapper.py
+    reason: Retains the last stream chunk usage and records once after stream completion.
+  - symbol: TokenRecordingModelWrapper._record_usage
+    file: src/qwenpaw/token_usage/model_wrapper.py
+    reason: Converts ChatUsage input/output counts into _UsageEvent and per-session usage.
+  - symbol: TokenUsageManager.enqueue
+    file: src/qwenpaw/token_usage/manager.py
+    reason: Synchronous hot-path handoff to the buffer.
+  - symbol: TokenUsageBuffer._consumer_loop
+    file: src/qwenpaw/token_usage/buffer.py
+    reason: Applies queued events into the in-memory disk cache.
+  - symbol: _apply_event
+    file: src/qwenpaw/token_usage/buffer.py
+    reason: Aggregates prompt_tokens, completion_tokens and call_count by date and provider:model.
+  - symbol: TokenUsageBuffer.get_merged_data
+    file: src/qwenpaw/token_usage/buffer.py
+    reason: Merges processed cache with a snapshot of still-pending queue items for current queries.
+  - symbol: save_data_sync
+    file: src/qwenpaw/token_usage/storage.py
+    reason: Atomically persists aggregated usage to token_usage.json.
+  - symbol: TokenUsageManager.get_summary
+    file: src/qwenpaw/token_usage/manager.py
+    reason: Applies date/provider/model filters and builds totals, by_model and by_date views.
+
+expected_data_flow:
+  - field: ChatUsage.input_tokens
+    route: "ChatResponse.usage -> _record_usage -> _UsageEvent.prompt_tokens -> _apply_event -> TokenUsageSummary.total_prompt_tokens"
+  - field: ChatUsage.output_tokens
+    route: "ChatResponse.usage -> _UsageEvent.completion_tokens -> token_usage.json -> API/tool summary"
+  - field: provider_id:model_name
+    route: "wrapper identity -> provider:model cache key -> TokenUsageSummary.by_model"
+
+must_mention:
+  - Missing or all-zero usage is ignored.
+  - Streaming usage is recorded only after successful stream exhaustion using the last usage-bearing chunk.
+  - Queries include pending queue entries so a user need not wait for the periodic disk flush.
+  - stop drains the queue, cancels periodic work and forces a final flush.
+  - Per-session pop storage is separate from long-term date/provider/model aggregation.
+
+must_exclude_from_impact:
+  - symbol: estimate_token_counter
+    reason: Estimates context size but does not record provider-reported billing usage.
+
+recommended_validation:
+  - python -m pytest tests/unit/token_usage/test_token_usage.py
+  - Add a stream test with multiple chunks where only the final chunk contains usage, plus a query-before-flush assertion.
+

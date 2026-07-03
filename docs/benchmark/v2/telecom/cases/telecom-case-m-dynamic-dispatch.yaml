@@ -1,0 +1,41 @@
+id: telecom-case-m-dynamic-dispatch
+name: Telecom interface dispatch, template method and default method analysis
+level: L2
+task_type: call_graph
+repo: telecom-ops-platform
+status: draft-ground-truth
+
+prompt: |
+  请分析 ChangeExecutionService.execute 中 ChangeExecutor.execute(ChangeContext) 调用点的
+  static_target、possible_targets 以及在 ROUTER、TRANSMISSION、RADIO 三组固定输入下的 runtime_target。
+  继续展开 AbstractChangeExecutor 的模板方法 executeTemplate：
+  - validate/apply 的 static_target 是抽象方法；
+  - 各 concrete executor 的 override 是 possible_targets；
+  - 固定输入下的 runtime_target 是哪个具体实现。
+  还需要分析 RollbackHandler 的 default rollback 方法：
+  - StandardRollbackHandler 继承 default method；
+  - RemoteRollbackHandler override rollback；
+  - 在 benchmark profile 下的 runtime_target。
+  对每个调用点分别写明 static_target、possible_targets、runtime_target。
+
+graph_queries:
+  - 'context({name: "ChangeExecutor"})'
+  - 'context({name: "AbstractChangeExecutor"})'
+  - 'impact({target: "execute", direction: "downstream"})'
+
+grep_searches:
+  - rg "implements ChangeExecutor|extends AbstractChangeExecutor"
+  - rg "executor\.execute\(|executeTemplate\("
+
+ground_truth: docs/benchmark/v2/telecom/ground-truth/telecom-case-m-ground-truth.yaml
+
+risk_level: HIGH
+
+scoring:
+  must_identify:
+    - interface dispatch 三层目标
+    - template method override
+    - default method vs override
+  must_exclude:
+    - SafeChangeExecutor 在 registry 调用点中的 possible_targets
+    - UnrelatedExecuteService

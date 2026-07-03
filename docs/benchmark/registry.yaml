@@ -1,0 +1,19 @@
+format_version: 1
+versions:
+- id: v1
+  path: docs/benchmark/v1
+  status: git-managed
+  source: git-head
+  source_commit: fe4640ddd964cd1a032abba075cbd039f923fd9e
+- id: v2
+  path: docs/benchmark/v2
+  status: git-managed
+  source: benchmark-working-tree-snapshot
+  parent_version: v1
+- id: v3
+  path: docs/benchmark/v3
+  status: git-managed
+  source: derived-version
+  parent_version: v2
+cross_version_aggregation: forbidden
+implicit_latest: forbidden

@@ -1,0 +1,98 @@
+case_id: qwenpaw-case-v-backup-restore-flow
+task_type: flow_tracing
+ground_truth_status: reviewed
+
+expected_routes:
+  - id: route.backup-restore
+    method: POST
+    path: /backups/{backup_id}/restore
+    handler: restore_backup
+
+expected_entrypoints:
+  - id: entry.backup-restore
+    symbol: restore_backup
+    file: src/qwenpaw/app/routers/backup.py
+
+expected_symbols:
+  - id: symbol.execute-restore
+    symbol: execute_restore
+    file: src/qwenpaw/backup/orchestration.py
+  - id: symbol.preflight-restore
+    symbol: preflight_restore
+    file: src/qwenpaw/backup/_ops/restore.py
+  - id: symbol.stop-browsers
+    symbol: stop_browsers_for_workspace_dirs
+    file: src/qwenpaw/agents/tools/browser_control.py
+  - id: symbol.restore
+    symbol: restore
+    file: src/qwenpaw/backup/_ops/restore.py
+  - id: symbol.restore-process-lock
+    symbol: restore_process_lock
+    file: src/qwenpaw/backup/_utils/safe_swap.py
+  - id: symbol.restore-sync-locked
+    symbol: _restore_sync_locked
+    file: src/qwenpaw/backup/_ops/restore.py
+  - id: symbol.preload-agents-background
+    symbol: _preload_agents_background
+    file: src/qwenpaw/backup/orchestration.py
+
+expected_edges:
+  - id: edge.handler-to-execute-restore
+    from: restore_backup
+    to: execute_restore
+    relation: calls
+  - id: edge.execute-to-preflight
+    from: execute_restore
+    to: preflight_restore
+    relation: calls
+  - id: edge.execute-to-stop-agent-callback
+    from: execute_restore
+    to: stop_agent_fn
+    relation: calls_callback
+  - id: edge.stop-agent-to-browser-stop
+    from: stop_agent_fn
+    to: stop_browsers_for_workspace_dirs
+    relation: ordered_before
+  - id: edge.browser-stop-to-restore
+    from: stop_browsers_for_workspace_dirs
+    to: restore
+    relation: ordered_before
+  - id: edge.restore-to-sync
+    from: restore
+    to: _restore_sync
+    relation: delegates
+  - id: edge.sync-to-locked
+    from: _restore_sync
+    to: _restore_sync_locked
+    relation: calls
+  - id: edge.finally-to-background-preload
+    from: execute_restore
+    to: _preload_agents_background
+    relation: schedules
+    control_context: finally
+  - id: edge.background-preload-to-callback
+    from: _preload_agents_background
+    to: preload_agent_fn
+    relation: calls_callback
+
+expected_facts:
+  - id: fact.trust-before-stop
+    description: Unsigned or foreign backup trust failure occurs before stopping agents.
+  - id: fact.secrets-expand-stop-set
+    description: Restoring secrets or skill pool expands the stop set to all loaded agents because any may hold directory handles.
+  - id: fact.requested-workspaces-only
+    description: Only requested agents present in workspace_stats are workspace restore targets.
+  - id: fact.lock-scopes-differ
+    description: The async lock and process lock solve different concurrency scopes.
+  - id: fact.preload-fire-and-forget
+    description: Preload is fire-and-forget, sequential per agent, and failures for one agent do not block later agents.
+
+noise_items:
+  - id: noise.create-backup-stream
+    symbol: create_backup_stream
+  - id: noise.import-backup-route
+    symbol: import_backup_route
+
+recommended_validation:
+  - python -m pytest tests/unit/backup/test_restore_orchestration.py tests/unit/backup/test_restore_signature_trust.py
+

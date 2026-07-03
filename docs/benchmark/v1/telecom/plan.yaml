@@ -1,0 +1,85 @@
+version: 1
+name: telecom-ops-platform-agent-benchmark
+
+target_project:
+  name: telecom-ops-platform_gitnexus
+  path: C:/qinliuwei/code/Gitnexus-benchmark/telecom-ops-platform_gitnexus
+  language: java
+  build_tool: maven
+  prerequisites:
+    java_home: C:/Program Files/Eclipse Adoptium/jdk-17.0.19.10-hotspot
+    maven_home: C:/tools/apache-maven-3.9.16
+  validation_commands:
+    - mvn test
+
+project_overview:
+  name: telecom-ops-platform
+  language: Java
+  framework: Spring Boot 3.x, Maven, H2
+  lines_of_code: 12387
+  modules: 6
+  description: 电信运维平台（12K 行基础版），涵盖设备采集、告警引擎、工单流转、通知、看板等模块
+
+case_source:
+  directory: cases
+  golden_directory: ground-truth
+  hide_expected_fields_from_agent: true
+  cases:
+    - id: telecom-case-a-metric-to-workorder-flow
+      file: cases/telecom-case-a-metric-to-workorder-flow.yaml
+      golden: ground-truth/telecom-case-a-ground-truth.yaml
+      task_type: flow_tracing
+      modification_case: false
+    - id: telecom-case-b-rule-evaluator-impact
+      file: cases/telecom-case-b-rule-evaluator-impact.yaml
+      golden: ground-truth/telecom-case-b-ground-truth.yaml
+      task_type: impact_analysis
+      modification_case: false
+    - id: telecom-case-c-region-code-rename
+      file: cases/telecom-case-c-region-code-rename.yaml
+      golden: ground-truth/telecom-case-c-ground-truth.yaml
+      task_type: small_code_change
+      modification_case: true
+
+run_matrix:
+  agents:
+    - claude-code
+    - opencode
+  tool_policies:
+    - grep
+    - graph
+  repeats_per_cell: 3
+  total_required_runs: 36
+
+isolation:
+  analysis_cases:
+    fresh_agent_context: true
+    clean_worktree_required: false
+    allow_no_edit: true
+  modification_cases:
+    fresh_agent_context: true
+    clean_worktree_required: true
+    isolated_worktree_per_run: true
+    reset_or_discard_after_run: true
+  forbidden_context:
+    - golden answers
+    - previous run outputs
+    - scoring notes
+    - benchmark design discussion documents
+
+expected_report_sections:
+  - per_case_agent_policy_scores
+  - claude_code_graph_vs_grep
+  - opencode_graph_vs_grep
+  - graph_uplift_across_agents
+  - claude_code_vs_opencode_under_grep
+  - claude_code_vs_opencode_under_graph
+  - invalid_or_policy_violating_runs
+  - qualitative_failure_patterns
+
+success_criteria:
+  - All required run cells produce a valid run-result JSON or an explicit invalid-run record.
+  - Case A reports flow coverage and side-effect coverage separately.
+  - Case B reports true RuleEvaluator implementations separately from evaluate() noise.
+  - Case C reports pre-change impact, implementation correctness, tests, diff cleanliness, and post-change verification separately.
+  - Final report does not attribute agent differences to GitNexus without the within-agent graph-vs-grep comparison.

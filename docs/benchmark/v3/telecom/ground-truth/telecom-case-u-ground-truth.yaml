@@ -1,0 +1,96 @@
+case_id: telecom-case-u-dashboard-overview-flow
+task_type: flow_tracing
+ground_truth_status: reviewed
+
+expected_routes:
+  - id: route.dashboard-overview
+    method: GET
+    path: /api/dashboard/overview
+    handler: OpsDashboardController.getDashboard
+
+expected_entrypoints:
+  - id: entry.dashboard-overview
+    symbol: OpsDashboardController.getDashboard
+    file: ops-gateway-service/src/main/java/com/example/telecom/gateway/controller/OpsDashboardController.java
+
+expected_symbols:
+  - id: symbol.dashboard-audit
+    symbol: GatewayAuditService.logDashboardAccess
+    file: ops-gateway-service/src/main/java/com/example/telecom/gateway/service/GatewayAuditService.java
+  - id: symbol.dashboard-query
+    symbol: OpsQueryService.buildDashboard
+    file: ops-gateway-service/src/main/java/com/example/telecom/gateway/service/OpsQueryService.java
+  - id: symbol.device-aggregation
+    symbol: DashboardAggregationService.aggregateDeviceHealth
+    file: ops-gateway-service/src/main/java/com/example/telecom/gateway/service/DashboardAggregationService.java
+  - id: symbol.alarm-aggregation
+    symbol: DashboardAggregationService.aggregateAlarms
+    file: ops-gateway-service/src/main/java/com/example/telecom/gateway/service/DashboardAggregationService.java
+  - id: symbol.workorder-aggregation
+    symbol: DashboardAggregationService.aggregateWorkOrders
+    file: ops-gateway-service/src/main/java/com/example/telecom/gateway/service/DashboardAggregationService.java
+  - id: symbol.dashboard-response-mapper
+    symbol: DashboardResponseMapper.toResponse
+    file: ops-gateway-service/src/main/java/com/example/telecom/gateway/mapper/DashboardResponseMapper.java
+
+expected_edges:
+  - id: edge.dashboard-handler-to-audit
+    from: OpsDashboardController.getDashboard
+    to: GatewayAuditService.logDashboardAccess
+    relation: calls
+  - id: edge.dashboard-handler-to-query
+    from: OpsDashboardController.getDashboard
+    to: OpsQueryService.buildDashboard
+    relation: calls
+  - id: edge.query-to-device-aggregation
+    from: OpsQueryService.buildDashboard
+    to: DashboardAggregationService.aggregateDeviceHealth
+    relation: calls
+  - id: edge.device-aggregation-to-client
+    from: DashboardAggregationService.aggregateDeviceHealth
+    to: DeviceClient.fetchDeviceSummary
+    relation: calls
+  - id: edge.query-to-alarm-aggregation
+    from: OpsQueryService.buildDashboard
+    to: DashboardAggregationService.aggregateAlarms
+    relation: calls
+  - id: edge.alarm-aggregation-to-client
+    from: DashboardAggregationService.aggregateAlarms
+    to: AlarmClient.fetchActiveAlarmSummary
+    relation: calls
+  - id: edge.query-to-workorder-aggregation
+    from: OpsQueryService.buildDashboard
+    to: DashboardAggregationService.aggregateWorkOrders
+    relation: calls
+  - id: edge.workorder-aggregation-to-client
+    from: DashboardAggregationService.aggregateWorkOrders
+    to: WorkOrderClient.fetchOpenWorkOrderSummary
+    relation: calls
+  - id: edge.query-to-response-mapper
+    from: OpsQueryService.buildDashboard
+    to: DashboardResponseMapper.toResponse
+    relation: joins
+  - id: edge.mapper-to-api-success
+    from: DashboardResponseMapper.toResponse
+    to: ApiResponse.success
+    relation: wrapped_by
+
+expected_facts:
+  - id: fact.aggregations-are-siblings
+    description: The three aggregation calls are sibling branches evaluated before mapping into one DashboardResponse.
+  - id: fact.region-code-not-client-filtered
+    description: regionCode is passed into every aggregate method and copied onto summaries; the current clients fetch unfiltered lists.
+  - id: fact.audit-before-query
+    description: The audit call occurs before buildDashboard and has no rollback if aggregation fails.
+  - id: fact.in-memory-and-fixed-counts
+    description: Device active counts and alarm severity counts are computed in memory; several work-order summary fields are currently fixed to zero.
+
+noise_items:
+  - id: noise.device-health-endpoint
+    symbol: OpsDashboardController.getDeviceHealth
+  - id: noise.dashboard-drilldown
+    symbol: DashboardDrilldownService
+
+recommended_validation:
+  - mvn -pl ops-gateway-service -am test -Dtest=OpsDashboardControllerTest,OpsQueryServiceTest,DashboardAggregationServiceTest,DashboardResponseMapperTest
+

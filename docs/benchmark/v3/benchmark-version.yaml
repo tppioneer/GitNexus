@@ -1,0 +1,30 @@
+format_version: 1
+benchmark_version: v3
+status: git-managed
+created_at: '2026-07-11T17:04:48.957592+00:00'
+parent_version: v2
+creation:
+  case_mode: copy
+compatibility:
+  score_comparable_with:
+  - v3
+  cross_version_aggregation: forbidden
+paths:
+  runner: runner/agent_benchmark_runner.py
+  external_runner: runner/run_external_benchmark.ps1
+  scoring_rubric: shared/scoring-rubric.md
+  result_schema: shared/schemas/run-result.schema.json
+  runs: runs/v3
+result_policy:
+  primary_comparison: paired-case-repeat
+  overwrite_existing_experiment: forbidden
+case_selection:
+  inherited_from: v2
+  included_case_numbers: [u, v]
+  projects: [qwenpaw, telecom, telecom-large]
+graph_execution_policy:
+  required_mcp_config: .mcp.json
+  strict_mcp_config: true
+  required_skills:
+    - gitnexus-claude-plugin/skills/gitnexus-exploring
+    - gitnexus-claude-plugin/skills/gitnexus-debugging

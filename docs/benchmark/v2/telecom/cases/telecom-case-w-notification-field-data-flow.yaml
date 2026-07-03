@@ -1,0 +1,17 @@
+id: telecom-case-w-notification-field-data-flow
+name: Telecom work-order notification field propagation
+level: L2
+task_type: data_flow
+repo: telecom-ops-platform
+status: reviewed
+
+prompt: |
+  请追踪一次工单状态变化中的 workOrderId、前后状态、assignee 和维护区域，如何进入事件、通知主题与正文、渠道请求以及最终的通知记录。
+  说明哪些字段参与渠道决策、哪些字段只用于展示或持久化，并指出字段丢失时可以由哪些测试发现。
+  不要修改代码，只输出有证据支持的数据流和验证建议。
+
+extra_desc: |
+  人工审阅提示，不进入公开载荷：从 WorkOrderEventPublisher 构造 WorkOrderEvent 开始，检查 NotificationTemplateService、determineChannel、NotificationRequest 和 NotificationRecord。
+
+ground_truth: docs/benchmark/v2/telecom/ground-truth/telecom-case-w-ground-truth.yaml
+

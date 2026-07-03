@@ -1,0 +1,38 @@
+case_id: telecom-case-z-notification-retry-loss-bug
+task_type: bug_localization
+ground_truth_status: reviewed
+
+expected_root_causes:
+  - symbol: NotificationRetryService.process
+    file: notification-service/src/main/java/com/example/telecom/notification/service/NotificationRetryService.java
+    reason: Calls retry with attempt numbers 1 through maxRetries and then returns without recording exhaustion.
+  - symbol: NotificationRetryService.retry
+    file: notification-service/src/main/java/com/example/telecom/notification/service/NotificationRetryService.java
+    reason: Saves failure only when attemptNumber > maxRetries, a value process never passes.
+  - symbol: NotificationFailureRepository.save
+    file: notification-service/src/main/java/com/example/telecom/notification/repository/NotificationFailureRepository.java
+    reason: Intended sink is unreachable from the normal exhausted process loop.
+  - symbol: NotificationRetryService.getFailureCount
+    file: notification-service/src/main/java/com/example/telecom/notification/service/NotificationRetryService.java
+    reason: Correctly reports the empty repository, exposing the lost failure record.
+
+expected_call_chains:
+  - route: "process -> for i=0..maxRetries-1 -> retry(attempt=i+1) -> channel.send -> false"
+  - route: "retry -> attemptNumber > maxRetries -> failureRepository.save (unreachable from process)"
+
+must_mention:
+  - maxRetries=3 yields attempts 1, 2 and 3; none satisfies greater-than 3.
+  - Calling retry directly with maxRetries+1 can save, which may let a narrow unit test miss the orchestration defect.
+  - The final failed send result is discarded by process.
+  - A successful earlier attempt returns immediately and must not create a failure record.
+
+must_exclude_from_impact:
+  - symbol: NotificationRepository.save
+    reason: Stores primary NotificationRecord, not exhausted retry failures.
+  - symbol: NotificationService.process
+    reason: Primary sending does not invoke this retry loop in the basic implementation.
+
+recommended_validation:
+  - mvn -pl notification-service -am test -Dtest=NotificationChannelSendTest,NotificationRepositoryTest
+  - Add a NotificationRetryService test with maxRetries=3 and an always-failing channel; assert exactly 3 sends and one saved failure after process returns.
+

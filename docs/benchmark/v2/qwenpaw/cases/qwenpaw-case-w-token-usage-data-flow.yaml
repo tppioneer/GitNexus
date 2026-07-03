@@ -1,0 +1,17 @@
+id: qwenpaw-case-w-token-usage-data-flow
+name: QwenPaw model token usage persistence data flow
+level: L2
+task_type: data_flow
+repo: QwenPaw
+status: reviewed
+
+prompt: |
+  请追踪一次模型调用返回的 prompt/completion token 数量，如何从响应中被采集、聚合、持久化，并最终出现在查询 API 和内置工具的统计结果中。
+  需要同时覆盖流式与非流式响应、尚未落盘的数据、进程停止时的收尾，以及 provider 与 model 维度的聚合边界。
+  不要修改代码，只输出有证据支持的数据流、关键字段、丢数风险和验证建议。
+
+extra_desc: |
+  Case 设计与人工审阅提示，不进入模型公开载荷：核对 TokenRecordingModelWrapper、_UsageEvent、TokenUsageManager、TokenUsageBuffer、_apply_event、storage、router 和 get_token_usage tool。
+
+ground_truth: docs/benchmark/v2/qwenpaw/ground-truth/qwenpaw-case-w-token-usage-data-flow-ground-truth.yaml
+

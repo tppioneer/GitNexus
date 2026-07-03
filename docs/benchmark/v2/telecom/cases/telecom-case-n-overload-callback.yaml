@@ -1,0 +1,43 @@
+id: telecom-case-n-overload-callback
+name: Telecom method overload, lambda, method reference and callback analysis
+level: L2
+task_type: call_graph
+repo: telecom-ops-platform
+status: draft-ground-truth
+
+prompt: |
+  请分析 network-change-service 中以下调用场景的精确目标：
+  1. ChangeCommandBus 三个同名 dispatch 方法的重载解析：
+     - dispatch(ChangeCommand) → 基类命令
+     - dispatch(EmergencyChangeCommand) → 紧急命令
+     - dispatch(String, ChangeMode) → 按 ID 和模式
+     各调用点的 static_target 和 runtime_target。
+  2. ChangeContext 构造器重载：两参、三参和完整参构造器。
+  3. lambda：executors.forEach(executor -> { ... executor.execute(ctx) })
+     中 lambda 体内对 executor.execute 的调用。
+  4. method reference：stepExecutor::executeStep 和 plan::markRunning。
+  5. callback registration：ChangeCallbackRegistry.register(ChangeStatus, Consumer<String>)
+     和 ChangeAuditService.onCompleted 作为 method reference callback。
+  Ground truth 必须写清参数签名，不能只写方法名。
+
+graph_queries:
+  - 'context({name: "ChangeCommandBus"})'
+  - 'context({name: "ChangeCallbackRegistry"})'
+  - 'context({name: "ChangeContext"})'
+
+grep_searches:
+  - rg "dispatch\(|::executeStep|::markRunning|::onCompleted"
+  - rg "ChangeCommandBus|ChangeCallbackRegistry"
+
+ground_truth: docs/benchmark/v2/telecom/ground-truth/telecom-case-n-ground-truth.yaml
+
+risk_level: MEDIUM
+
+scoring:
+  must_identify:
+    - 三个 dispatch 重载的精确签名
+    - lambda/method reference 目标
+    - callback registration 和 invocation
+  must_exclude:
+    - ChangeExecutionService.execute(String) 同名方法
+    - PluginDescriptor.executeMethodName 字符串

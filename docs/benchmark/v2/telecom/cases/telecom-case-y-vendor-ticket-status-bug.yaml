@@ -1,0 +1,17 @@
+id: telecom-case-y-vendor-ticket-status-bug
+name: Telecom vendor ticket invalid status acceptance bug
+level: L2
+task_type: bug_localization
+repo: telecom-ops-platform
+status: reviewed
+
+prompt: |
+  回归现象：调用 vendor-ticket 状态更新接口传入 `NOT_A_STATUS`，接口仍返回成功，之后该工单的厂商协同查询出现无法识别的状态。
+  请定位非法状态进入并被持久化的路径，解释为什么现有校验没有生效，并给出最小回归测试方案。
+  不要修改代码，只输出根因、证据、影响和验证建议。
+
+extra_desc: |
+  人工审阅提示，不进入公开载荷：重点检查 Controller 原始 String、VendorTicketService.updateStatus 和未被调用的 isValidStatus；不要误归因于 mapper。
+
+ground_truth: docs/benchmark/v2/telecom/ground-truth/telecom-case-y-ground-truth.yaml
+

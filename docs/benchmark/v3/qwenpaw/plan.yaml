@@ -1,0 +1,81 @@
+version: 1
+name: qwenpaw-multilanguage-agent-benchmark
+
+target_project:
+  name: QwenPaw
+  gitnexus_repo: QwenPaw
+  path: F:/develop/codes/QwenPaw/QwenPaw
+  language: python+typescript
+  build_tool: pyproject+pnpm
+  project_layout:
+    backend:
+      language: python
+      path: src/qwenpaw
+    frontend:
+      language: typescript
+      path: website
+  validation_commands:
+    - python -m pytest
+    - cd website && pnpm exec tsc -b --noEmit
+
+project_overview:
+  name: QwenPaw
+  language: Python + TypeScript
+  framework: Click CLI, FastAPI, Pydantic, Vue 3
+  lines_of_code: 88102
+  modules: 2
+  description: AI 编码助手后端服务，Python Click CLI 插件体系 + TypeScript 前端下载页面
+
+case_source:
+  directory: docs/benchmark/v3/qwenpaw/cases
+  golden_directory: docs/benchmark/v3/qwenpaw/ground-truth
+  hide_expected_fields_from_agent: true
+  cases:
+    - id: qwenpaw-case-u-console-chat-stream-flow
+      file: cases/qwenpaw-case-u-console-chat-stream-flow.yaml
+      golden: ground-truth/qwenpaw-case-u-console-chat-stream-flow-ground-truth.yaml
+      task_type: flow_tracing
+      modification_case: false
+    - id: qwenpaw-case-v-backup-restore-flow
+      file: cases/qwenpaw-case-v-backup-restore-flow.yaml
+      golden: ground-truth/qwenpaw-case-v-backup-restore-flow-ground-truth.yaml
+      task_type: flow_tracing
+      modification_case: false
+
+run_matrix:
+  agents:
+    - claude-code
+  tool_policies:
+    - grep
+    - graph
+  repeats_per_cell: 3
+  total_required_runs: 12  # 2 cases × 1 agent × 2 policies × 3 repeats
+
+isolation:
+  analysis_cases:
+    fresh_agent_context: true
+    clean_worktree_required: false
+    allow_no_edit: true
+  modification_cases:
+    fresh_agent_context: true
+    clean_worktree_required: true
+    isolated_worktree_per_run: true
+    reset_or_discard_after_run: true
+  forbidden_context:
+    - golden answers
+    - previous run outputs
+    - scoring notes
+    - benchmark design discussion documents
+
+expected_report_sections:
+  - per_case_agent_policy_scores
+  - claude_code_graph_vs_grep
+  - graph_uplift_across_agents
+  - invalid_or_policy_violating_runs
+  - qualitative_failure_patterns
+  - python_backend_vs_typescript_frontend_sensitivity
+
+success_criteria:
+  - All required run cells produce a valid run-result JSON or an explicit invalid-run record.
+  - Cases U-V trace complete production execution paths and distinguish synchronous, asynchronous, and reconnect branches.
+  - Final report distinguishes GitNexus graph uplift from agent-specific behavior.

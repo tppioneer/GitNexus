@@ -1,0 +1,47 @@
+case_id: qwenpaw-case-a-cli-lazy-command-flow
+task_type: flow_tracing
+
+expected_entrypoints:
+  - symbol: src/qwenpaw/__main__.py
+    file: src/qwenpaw/__main__.py
+    reason: Python module entry calls cli().
+  - symbol: qwenpaw.cli.main.cli
+    file: src/qwenpaw/cli/main.py
+    reason: Click root command group and shared host/port context setup.
+  - symbol: LazyGroup.__init__
+    file: src/qwenpaw/cli/main.py
+    reason: Constructor stores lazy_subcommands dict for later command resolution.
+
+expected_symbols:
+  - symbol: LazyGroup
+    file: src/qwenpaw/cli/main.py
+    reason: Custom Click group that lazily loads subcommands.
+  - symbol: LazyGroup.list_commands
+    file: src/qwenpaw/cli/main.py
+    reason: Merges eager commands with lazy_subcommands keys.
+  - symbol: LazyGroup.get_command
+    file: src/qwenpaw/cli/main.py
+    reason: Dynamically imports subcommand modules and caches loaded commands.
+  - symbol: read_last_api
+    file: src/qwenpaw/config/utils.py
+    reason: Supplies last-used API host/port fallback.
+  - symbol: write_last_api
+    file: src/qwenpaw/config/utils.py
+    reason: Persists host/port to config so next CLI run can use read_last_api fallback.
+
+expected_files:
+  - file: src/qwenpaw/cli/main.py
+  - file: src/qwenpaw/config/utils.py
+  - file: src/qwenpaw/cli/app_cmd.py
+
+must_mention:
+  - LazyGroup.lazy_subcommands maps command names to (module_path, attr_name, label) tuples.
+  - get_command first checks eager commands, then imports lazy command modules with __import__.
+  - Loaded lazy commands are cached with add_command.
+  - cli stores host and port in ctx.obj after read_last_api and default fallback.
+  - write_last_api persists host/port when app_cmd exits, enabling read_last_api fallback on next run.
+  - Adding a new CLI command requires updating lazy_subcommands and creating a new *_cmd.py module.
+
+recommended_validation:
+  - python -m pytest
+  - python -m qwenpaw --help

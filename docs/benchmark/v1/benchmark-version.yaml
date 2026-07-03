@@ -1,0 +1,20 @@
+format_version: 1
+benchmark_version: v1
+status: git-managed
+created_at: 2026-07-11T11:15:39+08:00
+source:
+  kind: git-head
+  commit: fe4640ddd964cd1a032abba075cbd039f923fd9e
+  branch_at_migration: patch/1.6.8_patch-case-design
+compatibility:
+  score_comparable_with: [v1]
+  cross_version_aggregation: forbidden
+paths:
+  runner: runner/agent_benchmark_runner.py
+  external_runner: runner/run_external_benchmark.ps1
+  scoring_rubric: shared/scoring-rubric.md
+  result_schema: shared/schemas/run-result.schema.json
+  runs: runs/v1
+result_policy:
+  primary_comparison: within-version
+  overwrite_existing_experiment: forbidden

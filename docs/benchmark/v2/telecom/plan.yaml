@@ -1,0 +1,168 @@
+version: 1
+name: telecom-ops-platform-agent-benchmark
+
+target_project:
+  name: telecom-ops-platform_gitnexus
+  gitnexus_repo: telecom
+  path: F:/develop/codes/Gitnexus-case-project/telecom-ops-platform
+  language: java
+  build_tool: maven
+  prerequisites:
+    java_home: C:/Program Files/Eclipse Adoptium/jdk-17.0.19.10-hotspot
+    maven_home: C:/maven/apache-maven-3.9.8
+    maven_cmd: C:/maven/apache-maven-3.9.8/bin/mvn.cmd
+  validation_commands:
+    - mvn test
+
+project_overview:
+  name: telecom-ops-platform
+  language: Java
+  framework: Spring Boot 3.x, Maven, H2
+  lines_of_code: 17943
+  modules: 7
+  description: 电信运维平台（7 模块 17.9K 行 Java），涵盖公共域、设备采集、告警引擎、工单流转、通知、运维网关、网络变更编排等模块
+
+case_source:
+  directory: docs/benchmark/v2/telecom/cases
+  golden_directory: docs/benchmark/v2/telecom/ground-truth
+  hide_expected_fields_from_agent: true
+  cases:
+    - id: telecom-case-d-notification-send-impact
+      file: cases/telecom-case-d-notification-send-impact.yaml
+      golden: ground-truth/telecom-case-d-ground-truth.yaml
+      task_type: impact_analysis
+      modification_case: false
+    - id: telecom-case-e-assignee-selector-impact
+      file: cases/telecom-case-e-assignee-selector-impact.yaml
+      golden: ground-truth/telecom-case-e-ground-truth.yaml
+      task_type: impact_analysis
+      modification_case: false
+    - id: telecom-case-f-workorder-transition-impact
+      file: cases/telecom-case-f-workorder-transition-impact.yaml
+      golden: ground-truth/telecom-case-f-ground-truth.yaml
+      task_type: impact_analysis
+      modification_case: false
+    - id: telecom-case-h-spring-route-matrix
+      file: cases/telecom-case-h-spring-route-matrix.yaml
+      golden: ground-truth/telecom-case-h-ground-truth.yaml
+      task_type: structure_extraction
+      modification_case: false
+    - id: telecom-case-i-java-annotation-binding
+      file: cases/telecom-case-i-java-annotation-binding.yaml
+      golden: ground-truth/telecom-case-i-ground-truth.yaml
+      task_type: symbol_navigation
+      modification_case: false
+    - id: telecom-case-j-spring-di-selection
+      file: cases/telecom-case-j-spring-di-selection.yaml
+      golden: ground-truth/telecom-case-j-ground-truth.yaml
+      task_type: framework_dispatch
+      modification_case: false
+    - id: telecom-case-k-transaction-boundary
+      file: cases/telecom-case-k-transaction-boundary.yaml
+      golden: ground-truth/telecom-case-k-ground-truth.yaml
+      task_type: framework_semantics
+      modification_case: false
+    - id: telecom-case-l-jpa-mapping
+      file: cases/telecom-case-l-jpa-mapping.yaml
+      golden: ground-truth/telecom-case-l-ground-truth.yaml
+      task_type: framework_structure
+      modification_case: false
+    - id: telecom-case-m-dynamic-dispatch
+      file: cases/telecom-case-m-dynamic-dispatch.yaml
+      golden: ground-truth/telecom-case-m-ground-truth.yaml
+      task_type: call_graph
+      modification_case: false
+    - id: telecom-case-n-overload-callback
+      file: cases/telecom-case-n-overload-callback.yaml
+      golden: ground-truth/telecom-case-n-ground-truth.yaml
+      task_type: call_graph
+      modification_case: false
+    - id: telecom-case-o-framework-reflection-boundary
+      file: cases/telecom-case-o-framework-reflection-boundary.yaml
+      golden: ground-truth/telecom-case-o-ground-truth.yaml
+      task_type: coverage_boundary
+      modification_case: false
+    - id: telecom-case-u-dashboard-overview-flow
+      file: cases/telecom-case-u-dashboard-overview-flow.yaml
+      golden: ground-truth/telecom-case-u-ground-truth.yaml
+      task_type: flow_tracing
+      modification_case: false
+    - id: telecom-case-v-workorder-notification-flow
+      file: cases/telecom-case-v-workorder-notification-flow.yaml
+      golden: ground-truth/telecom-case-v-ground-truth.yaml
+      task_type: flow_tracing
+      modification_case: false
+    - id: telecom-case-w-notification-field-data-flow
+      file: cases/telecom-case-w-notification-field-data-flow.yaml
+      golden: ground-truth/telecom-case-w-ground-truth.yaml
+      task_type: data_flow
+      modification_case: false
+    - id: telecom-case-x-alarm-severity-sla-data-flow
+      file: cases/telecom-case-x-alarm-severity-sla-data-flow.yaml
+      golden: ground-truth/telecom-case-x-ground-truth.yaml
+      task_type: data_flow
+      modification_case: false
+    - id: telecom-case-y-vendor-ticket-status-bug
+      file: cases/telecom-case-y-vendor-ticket-status-bug.yaml
+      golden: ground-truth/telecom-case-y-ground-truth.yaml
+      task_type: bug_localization
+      modification_case: false
+    - id: telecom-case-z-notification-retry-loss-bug
+      file: cases/telecom-case-z-notification-retry-loss-bug.yaml
+      golden: ground-truth/telecom-case-z-ground-truth.yaml
+      task_type: bug_localization
+      modification_case: false
+
+run_matrix:
+  agents:
+    - claude-code
+    - opencode
+  tool_policies:
+    - grep
+    - graph
+  repeats_per_cell: 3
+  total_required_runs: 204  # 17 cases × 2 agents × 2 policies × 3 repeats
+
+isolation:
+  analysis_cases:
+    fresh_agent_context: true
+    clean_worktree_required: false
+    allow_no_edit: true
+  modification_cases:
+    fresh_agent_context: true
+    clean_worktree_required: true
+    isolated_worktree_per_run: true
+    reset_or_discard_after_run: true
+  forbidden_context:
+    - golden answers
+    - previous run outputs
+    - scoring notes
+    - benchmark design discussion documents
+
+expected_report_sections:
+  - per_case_agent_policy_scores
+  - claude_code_graph_vs_grep
+  - opencode_graph_vs_grep
+  - graph_uplift_across_agents
+  - claude_code_vs_opencode_under_grep
+  - claude_code_vs_opencode_under_graph
+  - invalid_or_policy_violating_runs
+  - qualitative_failure_patterns
+
+success_criteria:
+  - All required run cells produce a valid run-result JSON or an explicit invalid-run record.
+  - Case D distinguishes NotificationChannel implementations and retry callers from unrelated send methods.
+  - Case E traces AssigneeSelector implementations through Registry to automatic, bulk, and event-driven assignment paths.
+  - Case F reports all six WorkOrderFlowService transition callers and their upstream entrypoints.
+  - Case H lists all R01-R12 routes with correct HTTP method, path, handler linkage, and class-prefix composition.
+  - Case I identifies all 8 custom annotation types, their elements, applications, repeatable containers, and meta-annotation chains.
+  - Case J correctly resolves @Qualifier, @Primary, @Profile, custom qualifier, and collection injection under each profile.
+  - Case K identifies all @Transactional boundaries, propagation, readOnly, and explains the self-invocation trap.
+  - Case L maps all JPA entities, relationships, embedded objects, and repository queries (derived, JPQL, native).
+  - Case M provides three-layer dispatch truth (static/possible/runtime) for interface, template method, and default method calls.
+  - Case N resolves all three ChangeCommandBus.dispatch overloads by exact signature, plus lambda/method reference/callback targets.
+  - Case O correctly classifies Spring event dispatch, AOP advice, reflection, and ServiceLoader edges without confusing them with direct calls.
+  - Cases U-V trace complete production execution paths and identify branch boundaries and side effects.
+  - Cases W-X trace field-level transformations and explicitly account for dropped or derived values.
+  - Cases Y-Z identify the executable root cause and propose regression checks tied to the failure mechanism.
+  - Final report does not attribute agent differences to GitNexus without the within-agent graph-vs-grep comparison.

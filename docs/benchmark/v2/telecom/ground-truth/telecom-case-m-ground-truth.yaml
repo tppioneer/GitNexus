@@ -1,0 +1,233 @@
+case_id: telecom-case-m-dynamic-dispatch
+task_type: call_graph
+truth_version: '2.1'
+ground_truth_status: draft
+expected_entrypoints:
+- id: ep.change-execution-service
+  symbol: ChangeExecutionService
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeExecutionService.java
+expected_symbols:
+- id: sym.change-executor
+  symbol: ChangeExecutor
+  file: network-change-service/src/main/java/com/example/telecom/change/executor/ChangeExecutor.java
+- id: sym.abstract-change-executor
+  symbol: AbstractChangeExecutor
+  file: network-change-service/src/main/java/com/example/telecom/change/executor/AbstractChangeExecutor.java
+- id: sym.router-executor
+  symbol: RouterChangeExecutor
+  file: network-change-service/src/main/java/com/example/telecom/change/executor/RouterChangeExecutor.java
+- id: sym.transmission-executor
+  symbol: TransmissionChangeExecutor
+  file: network-change-service/src/main/java/com/example/telecom/change/executor/TransmissionChangeExecutor.java
+- id: sym.radio-executor
+  symbol: RadioChangeExecutor
+  file: network-change-service/src/main/java/com/example/telecom/change/executor/RadioChangeExecutor.java
+- id: sym.rollback-handler
+  symbol: RollbackHandler
+  file: network-change-service/src/main/java/com/example/telecom/change/executor/RollbackHandler.java
+- id: sym.standard-rollback-handler
+  symbol: StandardRollbackHandler
+  file: network-change-service/src/main/java/com/example/telecom/change/executor/StandardRollbackHandler.java
+expected_facts:
+- id: fact.router-runtime-target
+  description: Under benchmark profile ROUTER family resolves to RouterChangeExecutor at runtime
+- id: fact.transmission-runtime-target
+  description: Under benchmark profile TRANSMISSION family resolves to TransmissionChangeExecutor at runtime
+- id: fact.radio-runtime-target
+  description: Under benchmark profile RADIO family resolves to RadioChangeExecutor at runtime
+- id: fact.safe-qualifier-fixed
+  description: safeExecutor.execute always resolves to SafeChangeExecutor regardless of device family due to @Qualifier
+- id: fact.template-method-chain
+  description: Each concrete executor.execute calls executeTemplate which calls validate then apply then audit
+- id: fact.default-rollback
+  description: StandardRollbackHandler inherits default rollback method from RollbackHandler interface
+- id: fact.remote-rollback-override
+  description: RemoteRollbackHandler overrides rollback method but is only active when telecom.change.remote.enabled=true
+- id: fact.safe-excluded-from-registry
+  description: SafeChangeExecutor is excluded from registry possible_targets because it lacks @ChangeExecutorCandidate
+expected_edges:
+- id: edge.execute-to-resolve
+  from: ChangeExecutionService.execute
+  to: ChangeExecutorRegistry.resolve
+  relation: calls
+- id: edge.execute-to-execute
+  from: ChangeExecutionService.execute
+  to: ChangeExecutor.execute
+  relation: calls
+- id: edge.concrete-to-template
+  from: RouterChangeExecutor.execute
+  to: AbstractChangeExecutor.executeTemplate
+  relation: calls
+call_sites:
+- id: registry-execute
+  caller: ChangeExecutionService.execute
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeExecutionService.java
+  call_expression: executor.execute(context)
+  static_target: ChangeExecutor.execute(ChangeContext)
+  edge_kind: JAVA_INTERFACE_DISPATCH
+  possible_targets:
+  - RouterChangeExecutor.execute(ChangeContext)
+  - TransmissionChangeExecutor.execute(ChangeContext)
+  - RadioChangeExecutor.execute(ChangeContext)
+  - DryRunChangeExecutor.execute(ChangeContext)
+  excluded_targets:
+  - symbol: SafeChangeExecutor.execute(ChangeContext)
+    reason: Excluded from registry by @ChangeExecutorCandidate — not in registry candidate set
+  - symbol: UnrelatedExecuteService.execute(ChangeContext)
+    reason: Does not implement ChangeExecutor — not an interface dispatch target
+  runtime_cases:
+  - profile: benchmark
+    input: DeviceFamily.ROUTER
+    runtime_target: RouterChangeExecutor.execute(ChangeContext)
+    executor_name: RouterChangeExecutor
+  - profile: benchmark
+    input: DeviceFamily.TRANSMISSION
+    runtime_target: TransmissionChangeExecutor.execute(ChangeContext)
+    executor_name: TransmissionChangeExecutor
+  - profile: benchmark
+    input: DeviceFamily.RADIO
+    runtime_target: RadioChangeExecutor.execute(ChangeContext)
+    executor_name: RadioChangeExecutor
+  - profile: dry-run
+    input: any family
+    runtime_target: DryRunChangeExecutor.execute(ChangeContext)
+    note: DryRunChangeExecutor supports ALL — may override family-specific mapping
+- id: safe-execute
+  caller: ChangeExecutionService.executeSafe
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeExecutionService.java
+  call_expression: safeExecutor.execute(context)
+  static_target: ChangeExecutor.execute(ChangeContext)
+  edge_kind: JAVA_INTERFACE_DISPATCH
+  possible_targets:
+  - SafeChangeExecutor.execute(ChangeContext)
+  runtime_cases:
+  - profile: benchmark
+    input: any
+    runtime_target: SafeChangeExecutor.execute(ChangeContext)
+    reason: '@Qualifier("safeExecutor") fixes the target at injection time'
+- id: facade-default-execute
+  caller: DefaultExecutorFacade.executeDefault
+  file: network-change-service/src/main/java/com/example/telecom/change/executor/DefaultExecutorFacade.java
+  call_expression: defaultExecutor.execute(context)
+  static_target: ChangeExecutor.execute(ChangeContext)
+  edge_kind: JAVA_INTERFACE_DISPATCH
+  possible_targets:
+  - RadioChangeExecutor.execute(ChangeContext)
+  runtime_cases:
+  - profile: benchmark
+    input: any
+    runtime_target: RadioChangeExecutor.execute(ChangeContext)
+    reason: '@Primary on RadioChangeExecutor resolves bare ChangeExecutor injection'
+- id: facade-legacy-execute
+  caller: DefaultExecutorFacade.executeLegacy
+  file: network-change-service/src/main/java/com/example/telecom/change/executor/DefaultExecutorFacade.java
+  call_expression: legacyExecutor.execute(context)
+  static_target: ChangeExecutor.execute(ChangeContext)
+  edge_kind: JAVA_INTERFACE_DISPATCH
+  runtime_cases:
+  - profile: benchmark
+    input: any
+    runtime_target: RouterChangeExecutor.execute(ChangeContext)
+    reason: '@Qualifier("routerExecutor") field injection'
+- id: template-executeTemplate
+  caller: RouterChangeExecutor.execute / TransmissionChangeExecutor.execute / RadioChangeExecutor.execute / DryRunChangeExecutor.execute / SafeChangeExecutor.execute
+  call_expression: executeTemplate(context)
+  static_target: AbstractChangeExecutor.executeTemplate(ChangeContext)
+  edge_kind: JAVA_DIRECT_CALL
+template_method_dispatch:
+  template_method:
+    name: AbstractChangeExecutor.executeTemplate
+    file: network-change-service/src/main/java/com/example/telecom/change/executor/AbstractChangeExecutor.java
+    calls:
+    - method: validate(ChangeContext)
+      static_target: AbstractChangeExecutor.validate(ChangeContext)
+      edge_kind: JAVA_ABSTRACT_DISPATCH
+      possible_targets:
+      - RouterChangeExecutor.validate(ChangeContext)
+      - TransmissionChangeExecutor.validate(ChangeContext)
+      - RadioChangeExecutor.validate(ChangeContext)
+      - DryRunChangeExecutor.validate(ChangeContext)
+      - SafeChangeExecutor.validate(ChangeContext)
+      runtime_cases:
+      - input: ROUTER via RouterChangeExecutor.execute
+        runtime_target: RouterChangeExecutor.validate(ChangeContext)
+      - input: TRANSMISSION via TransmissionChangeExecutor.execute
+        runtime_target: TransmissionChangeExecutor.validate(ChangeContext)
+      - input: RADIO via RadioChangeExecutor.execute
+        runtime_target: RadioChangeExecutor.validate(ChangeContext)
+    - method: apply(ChangeContext)
+      static_target: AbstractChangeExecutor.apply(ChangeContext)
+      edge_kind: JAVA_ABSTRACT_DISPATCH
+      possible_targets:
+      - RouterChangeExecutor.apply(ChangeContext)
+      - TransmissionChangeExecutor.apply(ChangeContext)
+      - RadioChangeExecutor.apply(ChangeContext)
+      - DryRunChangeExecutor.apply(ChangeContext)
+      - SafeChangeExecutor.apply(ChangeContext)
+      runtime_cases:
+      - input: ROUTER via RouterChangeExecutor.execute
+        runtime_target: RouterChangeExecutor.apply(ChangeContext)
+      - input: TRANSMISSION via TransmissionChangeExecutor.execute
+        runtime_target: TransmissionChangeExecutor.apply(ChangeContext)
+      - input: RADIO via RadioChangeExecutor.execute
+        runtime_target: RadioChangeExecutor.apply(ChangeContext)
+    - method: audit(ChangeContext, ExecutionResult)
+      static_target: AbstractChangeExecutor.audit(ChangeContext, ExecutionResult)
+      edge_kind: JAVA_VIRTUAL_CALL
+      possible_targets:
+      - AbstractChangeExecutor.audit(ChangeContext, ExecutionResult)
+      - RouterChangeExecutor.audit(ChangeContext, ExecutionResult)
+      runtime_cases:
+      - input: ROUTER via RouterChangeExecutor.execute
+        runtime_target: RouterChangeExecutor.audit(ChangeContext, ExecutionResult)
+      - input: TRANSMISSION/RADIO
+        runtime_target: AbstractChangeExecutor.audit(ChangeContext, ExecutionResult)
+        reason: TransmissionChangeExecutor and RadioChangeExecutor do not override audit
+default_method_dispatch:
+  interface: RollbackHandler
+  file: network-change-service/src/main/java/com/example/telecom/change/executor/RollbackHandler.java
+  default_method:
+    name: rollback(ChangeContext)
+    signature: default RollbackResult rollback(ChangeContext context)
+    body: 'return validateRollback(context) ? doRollback(context) : RollbackResult.skipped();'
+  implementations:
+  - class: StandardRollbackHandler
+    file: network-change-service/src/main/java/com/example/telecom/change/executor/StandardRollbackHandler.java
+    rollback_override: false
+    effective_rollback: inherited default method
+    runtime_target: RollbackHandler.rollback(ChangeContext) — default implementation
+  - class: RemoteRollbackHandler
+    file: network-change-service/src/main/java/com/example/telecom/change/executor/RemoteRollbackHandler.java
+    rollback_override: true
+    runtime_target: RemoteRollbackHandler.rollback(ChangeContext) — override
+    condition: '@ConditionalOnProperty(telecom.change.remote.enabled=true)'
+  runtime_cases:
+  - profile: benchmark
+    remote_enabled: false
+    handler: StandardRollbackHandler
+    runtime_target: RollbackHandler.rollback default method
+  - profile: any
+    remote_enabled: true
+    handler: RemoteRollbackHandler
+    runtime_target: RemoteRollbackHandler.rollback override
+test_classes:
+- name: CaseMDynamicDispatchTest
+  file: network-change-service/src/test/java/com/example/telecom/change/executor/CaseMDynamicDispatchTest.java
+- name: TemplateMethodDispatchTest
+  file: network-change-service/src/test/java/com/example/telecom/change/executor/TemplateMethodDispatchTest.java
+- name: RollbackDefaultMethodTest
+  file: network-change-service/src/test/java/com/example/telecom/change/executor/RollbackDefaultMethodTest.java
+recommended_validation:
+- mvn -pl network-change-service -am test -Dtest=CaseMDynamicDispatchTest,TemplateMethodDispatchTest,RollbackDefaultMethodTest
+source_commit: 5c2fdcdf9e3b7829fc8ace183e2b0876ccbb188a
+source_dirty: true
+source_scope_clean: true
+source_project: telecom-ops-platform
+source_module: network-change-service
+reviewed_at: '2026-07-20'
+analysis_scope: src/main/java only
+dimension_weights:
+  dispatch_accuracy: 40
+  symbols: 25
+  facts: 25
+  noise: 10

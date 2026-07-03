@@ -1,0 +1,38 @@
+case_id: telecom-large-case-y-dispatch-priority-filter-bug
+task_type: bug_localization
+ground_truth_status: reviewed
+
+expected_root_causes:
+  - symbol: DispatchController.listOrders
+    file: dispatch-service/src/main/java/com/example/telecom/dispatch/controller/DispatchController.java
+    reason: Correctly receives priority and forwards it to the service, so the HTTP binding is not the loss point.
+  - symbol: DispatchOrchestrationService.listOrders
+    file: dispatch-service/src/main/java/com/example/telecom/dispatch/service/DispatchOrchestrationService.java
+    reason: Implements status and regionCode filters but never reads the priority argument.
+  - symbol: DispatchOrder.getPriority
+    file: common-domain/src/main/java/com/example/telecom/common/dispatch/DispatchOrder.java
+    reason: The data required to filter is present on every order.
+  - symbol: DispatchMapper.toResponse
+    file: dispatch-service/src/main/java/com/example/telecom/dispatch/mapper/DispatchMapper.java
+    reason: Maps already-selected orders and therefore cannot repair the missing filter.
+
+expected_data_flow:
+  - field: priority
+    route: "HTTP query -> DispatchController.listOrders -> service parameter -> ignored before pagination"
+
+must_mention:
+  - status and regionCode are applied before total and page slicing; priority should be applied at the same stage.
+  - Filtering after pagination would produce wrong total counts and incomplete pages.
+  - The service also accepts priority as String while the domain uses DispatchPriority, so invalid-value behavior needs an explicit decision/test.
+  - Repository methods for priority exist elsewhere but this method starts from findAll.
+
+must_exclude_from_impact:
+  - symbol: DispatchOrchestrationService.getDispatchesByPriority
+    reason: Separate endpoint/helper works but is not used by listOrders.
+  - symbol: DispatchRule.evaluate
+    reason: Dispatch rules do not implement query filtering.
+
+recommended_validation:
+  - Add DispatchController/listOrders tests with mixed priorities and combined status+priority+regionCode filters.
+  - Assert filtered totalElements and page boundaries, plus invalid priority behavior.
+

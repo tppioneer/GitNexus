@@ -1,0 +1,73 @@
+case: telecom-case-c-region-code-rename
+level: L3 - small_code_change
+title: "DeviceInfo.regionCode 字段重命名为 maintenanceRegionCode"
+
+description: >
+  DeviceInfo.regionCode 是设备维护区域编码。需要重命名为 maintenanceRegionCode。
+  下游字段在不同 bounded context 中使用不同的语义名称，
+  不能简单全局替换 regionCode。
+
+task: >
+  将 DeviceInfo.regionCode 重命名为 maintenanceRegionCode，
+  同步更新采集、告警、工单、Dashboard 和测试 fixture。
+  修改前先输出影响分析，修改后说明变更范围。
+
+source_field:
+  class: DeviceInfo
+  package: com.example.telecom.common.device
+  current_name: regionCode
+  new_name: maintenanceRegionCode
+
+propagation_chain:
+  - "DeviceInfo.regionCode → DeviceMetricEvent.deviceRegionCode (via DeviceMetricMapper)"
+  - "DeviceMetricEvent.deviceRegionCode → AlarmRecord.alarmRegionCode (via AlarmRecordMapper)"
+  - "AlarmRecord.alarmRegionCode → AlarmEvent.deviceRegionCode (via AlarmRecordMapper)"
+  - "AlarmEvent.deviceRegionCode → WorkOrder.maintenanceRegionCode (via AutoWorkOrderService)"
+  - "WorkOrder.maintenanceRegionCode → DashboardDeviceHealth.regionCode (via DashboardResponseMapper)"
+
+files_to_modify:
+  - common-domain/src/main/java/com/example/telecom/common/device/DeviceInfo.java
+  - common-domain/src/main/java/com/example/telecom/common/event/DeviceMetricEvent.java
+  - common-domain/src/main/java/com/example/telecom/common/alarm/AlarmRecord.java
+  - common-domain/src/main/java/com/example/telecom/common/event/AlarmEvent.java
+  - common-domain/src/main/java/com/example/telecom/common/workorder/WorkOrder.java
+  - device-collector-service/src/main/java/.../mapper/DeviceMetricMapper.java
+  - device-collector-service/src/main/java/.../service/DeviceRegistryService.java
+  - alarm-engine-service/src/main/java/.../mapper/AlarmRecordMapper.java
+  - alarm-engine-service/src/main/java/.../service/AlarmEvaluationService.java
+  - workorder-service/src/main/java/.../service/AutoWorkOrderService.java
+  - ops-gateway-service/src/main/java/.../service/DashboardAggregationService.java
+  - ops-gateway-service/src/main/java/.../mapper/DashboardResponseMapper.java
+
+distraction_fields_NOT_to_modify:
+  - Region.regionCode (区域实体自身编码，不同语义)
+  - OperatorUser.regionCode (人员所属区域，不同语义)
+  - RegionFilterRequest.regionCode (过滤请求参数，不同语义)
+
+graph_queries:
+  - 'context({name: "DeviceInfo"})'
+  - 'impact({target: "regionCode", direction: "upstream"})'
+  - 'detect_changes()'
+
+grep_searches:
+  - rg "regionCode"
+  - rg "DeviceInfo"
+  - rg "DeviceMetricEvent|AlarmRecord|WorkOrder|DashboardResponse"
+
+ground_truth: docs/benchmark/v1/telecom/ground-truth/telecom-case-c-ground-truth.yaml
+
+verification:
+  - mvn test
+
+scoring:
+  must_correctly_handle:
+    - 区分字段所属类型
+    - mapper 中的显式字段传递
+    - JSON fixture 中的字符串 key
+    - Region/OperatorUser/RegionFilterRequest 的 regionCode 不修改
+
+  penalty_items:
+    - 遗漏 mapper 或 DTO 中的字段
+    - 遗漏 JSON fixture
+    - 误改 Region.regionCode
+    - 误改 OperatorUser.regionCode

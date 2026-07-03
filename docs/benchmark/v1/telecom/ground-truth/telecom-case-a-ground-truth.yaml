@@ -1,0 +1,154 @@
+case: telecom-case-a
+ground_truth_type: flow_tracing
+truth_version: "1.0"
+
+expected_call_chain:
+  - step: 1
+    symbol: DeviceMetricIngestController.ingestMetric
+    file: device-collector-service/.../controller/DeviceMetricIngestController.java
+    side_effect: "Entry point: receives HTTP POST request"
+
+  - step: 2
+    symbol: DeviceRegistryService.findActiveDevice
+    file: device-collector-service/.../service/DeviceRegistryService.java
+    side_effect: "Validates device exists and is active"
+
+  - step: 3
+    symbol: VendorAdapterRegistry.resolve
+    file: device-collector-service/.../adapter/VendorAdapterRegistry.java
+    side_effect: "Selects vendor adapter based on device vendor"
+
+  - step: 4
+    symbol: VendorAdapter.normalizeRawMetric
+    file: device-collector-service/.../adapter/*VendorAdapter.java
+    side_effect: "Converts raw vendor metric to DeviceMetric"
+
+  - step: 5
+    symbol: MetricCollectorService.acceptMetric
+    file: device-collector-service/.../service/MetricCollectorService.java
+    side_effect: "Orchestrates validation, normalization, save, publish"
+
+  - step: 6
+    symbol: DeviceMetricValidator.validate
+    file: device-collector-service/.../validator/DeviceMetricValidator.java
+    side_effect: "Validates metric value ranges and device status"
+
+  - step: 7
+    symbol: DeviceMetricNormalizer.normalize
+    file: device-collector-service/.../service/DeviceMetricNormalizer.java
+    side_effect: "Marks metric as normalized, rounds values"
+
+  - step: 8
+    symbol: DeviceMetricRepository.save
+    file: device-collector-service/.../repository/DeviceMetricRepository.java
+    side_effect: "WRITE: stores metric in memory"
+
+  - step: 9
+    symbol: MetricEventPublisher.publish
+    file: device-collector-service/.../event/MetricEventPublisher.java
+    side_effect: "Calls DomainEventBus.publish(DeviceMetricEvent)"
+
+  - step: 10
+    symbol: DomainEventBus.publish(DeviceMetricEvent)
+    file: common-domain/.../event/DomainEventBus.java
+    side_effect: "Interface call — routes to InMemoryDomainEventBus"
+
+  - step: 11
+    symbol: InMemoryDomainEventBus.publish(DeviceMetricEvent)
+    file: common-domain/.../event/InMemoryDomainEventBus.java
+    side_effect: "Calls metricConsumer.onMetric(event)"
+
+  - step: 12
+    symbol: DeviceMetricEventConsumer.onMetric
+    file: alarm-engine-service/.../consumer/DeviceMetricEventConsumer.java
+    side_effect: "Delegates to AlarmEvaluationService.evaluate"
+
+  - step: 13
+    symbol: AlarmEvaluationService.evaluate
+    file: alarm-engine-service/.../service/AlarmEvaluationService.java
+    side_effect: "Orchestrates rule loading, evaluation, classification, dedup, correlation"
+
+  - step: 14
+    symbol: ThresholdRuleService.loadRules
+    file: alarm-engine-service/.../service/ThresholdRuleService.java
+    side_effect: "READ: loads enabled threshold rules for metric type"
+
+  - step: 15
+    symbol: RuleEvaluatorRegistry.resolve
+    file: alarm-engine-service/.../rule/RuleEvaluatorRegistry.java
+    side_effect: "Resolves correct RuleEvaluator implementation"
+
+  - step: 16
+    symbol: RuleEvaluator.evaluate
+    file: alarm-engine-service/.../rule/*RuleEvaluator.java
+    side_effect: "Evaluates metric against threshold, returns EvaluationResult"
+
+  - step: 17
+    symbol: AlarmSeverityClassifier.classify
+    file: alarm-engine-service/.../service/AlarmSeverityClassifier.java
+    side_effect: "Determines severity level, may escalate based on ratio"
+
+  - step: 18
+    symbol: AlarmDeduplicationService.deduplicate
+    file: alarm-engine-service/.../service/AlarmDeduplicationService.java
+    side_effect: "Checks for duplicate active alarms"
+
+  - step: 19
+    symbol: AlarmRepository.save
+    file: alarm-engine-service/.../repository/AlarmRepository.java
+    side_effect: "WRITE: stores alarm in memory"
+
+  - step: 20
+    symbol: AlarmEventPublisher.publish
+    file: alarm-engine-service/.../event/AlarmEventPublisher.java
+    side_effect: "Calls DomainEventBus.publish(AlarmEvent)"
+
+  - step: 21
+    symbol: InMemoryDomainEventBus.publish(AlarmEvent)
+    file: common-domain/.../event/InMemoryDomainEventBus.java
+    side_effect: "Calls alarmConsumer.onAlarmCreated(event)"
+
+  - step: 22
+    symbol: AlarmEventConsumer.onAlarmCreated
+    file: workorder-service/.../consumer/AlarmEventConsumer.java
+    side_effect: "Delegates to AutoWorkOrderService.createForAlarm"
+
+  - step: 23
+    symbol: AutoWorkOrderService.createForAlarm
+    file: workorder-service/.../service/AutoWorkOrderService.java
+    side_effect: "Creates WorkOrder from alarm, saves, triggers assignment"
+
+  - step: 24
+    symbol: WorkOrderRepository.save
+    file: workorder-service/.../repository/WorkOrderRepository.java
+    side_effect: "WRITE: stores work order in memory"
+
+  - step: 25
+    symbol: WorkOrderFlowService.assign
+    file: workorder-service/.../service/WorkOrderFlowService.java
+    side_effect: "Assigns work order via WorkOrderAssignmentService"
+
+  - step: 26
+    symbol: WorkOrderAssignmentService.assign
+    file: workorder-service/.../service/WorkOrderAssignmentService.java
+    side_effect: "Selects assignee via AssigneeSelectorRegistry"
+
+  - step: 27
+    symbol: WorkOrderStateMachine.transition
+    file: workorder-service/.../workflow/WorkOrderStateMachine.java
+    side_effect: "Transitions work order state CREATED → ASSIGNED"
+
+  - step: 28
+    symbol: WorkOrderEventPublisher.publish
+    file: workorder-service/.../event/WorkOrderEventPublisher.java
+    side_effect: "Calls DomainEventBus.publish(WorkOrderEvent)"
+
+not_in_chain:
+  - "NotificationService.process (notification is a side effect, not core flow)"
+  - "OpsDashboardController (dashboard is a query endpoint, not metric entry)"
+  - "DashboardAggregationService (read path, not write path)"
+
+critical_missing_penalty:
+  - "Missing any step between 1-28"
+  - "Missing DomainEventBus/InMemoryDomainEventBus steps"
+  - "Missing any Consumer step"

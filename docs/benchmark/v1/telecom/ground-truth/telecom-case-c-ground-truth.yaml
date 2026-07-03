@@ -1,0 +1,91 @@
+case: telecom-case-c
+ground_truth_type: field_rename
+truth_version: "1.0"
+
+change:
+  source_class: DeviceInfo
+  source_package: com.example.telecom.common.device
+  old_field: regionCode
+  new_field: maintenanceRegionCode
+
+files_to_modify:
+  - file: common-domain/src/main/java/com/example/telecom/common/device/DeviceInfo.java
+    changes:
+      - "Rename field: regionCode → maintenanceRegionCode"
+      - "Update getter: getRegionCode() → getMaintenanceRegionCode()"
+      - "Update setter: setRegionCode() → setMaintenanceRegionCode()"
+      - "Update constructor parameter"
+      - "Update @JsonProperty annotation"
+
+  - file: device-collector-service/src/main/java/.../mapper/DeviceMetricMapper.java
+    changes:
+      - "Update: deviceInfo.getRegionCode() → deviceInfo.getMaintenanceRegionCode()"
+    note: "Explicit field mapping DeviceInfo.regionCode → DeviceMetricEvent.deviceRegionCode"
+
+  - file: device-collector-service/src/main/java/.../service/DeviceRegistryService.java
+    changes:
+      - "Update: request.getRegionCode() → getMaintenanceRegionCode() mapping in register()"
+
+  - file: device-collector-service/src/main/java/.../validator/DeviceRegistrationValidator.java
+    changes:
+      - "Update: getRegionCode() → getMaintenanceRegionCode() in validation"
+
+  - file: alarm-engine-service/src/main/java/.../mapper/AlarmRecordMapper.java
+    changes:
+      - "Event.deviceRegionCode → AlarmRecord.alarmRegionCode mapping update if present"
+
+  - file: alarm-engine-service/src/main/java/.../service/AlarmEvaluationService.java
+    changes:
+      - "Update event.getDeviceRegionCode() reference if renamed"
+
+  - file: workorder-service/src/main/java/.../service/AutoWorkOrderService.java
+    changes:
+      - "Update event.getDeviceRegionCode() reference"
+
+  - file: ops-gateway-service/src/main/java/.../service/DashboardAggregationService.java
+    changes:
+      - "Update deviceInfo.getRegionCode() → getMaintenanceRegionCode()"
+
+  - file: "JSON fixture files containing regionCode for DeviceInfo"
+    changes:
+      - "Update regionCode key to maintenanceRegionCode in device-info fixture"
+
+files_NOT_to_modify:
+  - file: common-domain/src/main/java/com/example/telecom/common/region/Region.java
+    reason: "Region.regionCode is the region entity's own code — different semantic from DeviceInfo maintenance region"
+    field: regionCode
+
+  - file: common-domain/src/main/java/com/example/telecom/common/user/OperatorUser.java
+    reason: "OperatorUser.regionCode is the operator's assigned region — not device maintenance region"
+    field: regionCode
+
+  - file: ops-gateway-service/src/main/java/.../dto/RegionFilterRequest.java
+    reason: "RegionFilterRequest.regionCode is a query parameter — different semantic"
+    field: regionCode
+
+field_propagation_chain:
+  - "DeviceInfo.maintenanceRegionCode → DeviceMetricEvent.deviceRegionCode"
+  - "DeviceMetricEvent.deviceRegionCode → AlarmRecord.alarmRegionCode"
+  - "AlarmRecord.alarmRegionCode → AlarmEvent.deviceRegionCode"
+  - "AlarmEvent.deviceRegionCode → WorkOrder.maintenanceRegionCode"
+  - "WorkOrder.maintenanceRegionCode → DeviceHealthSummary.regionCode"
+
+verification:
+  - mvn test
+
+scoring_rubric:
+  correct:
+    - "All 7+ Java files updated"
+    - "JSON fixture keys updated"
+    - "Distraction fields preserved unchanged"
+    - "mvn test passes"
+
+  partial_credit:
+    - "Some Java files missed but key files covered"
+    - "JSON fixtures missed"
+
+  failure:
+    - "Region.regionCode modified"
+    - "OperatorUser.regionCode modified"
+    - "RegionFilterRequest.regionCode modified"
+    - "mvn test fails"

@@ -1,0 +1,38 @@
+case_id: telecom-case-y-vendor-ticket-status-bug
+task_type: bug_localization
+ground_truth_status: reviewed
+
+expected_root_causes:
+  - symbol: VendorTicketController.updateStatus
+    file: workorder-service/src/main/java/com/example/telecom/workorder/controller/VendorTicketController.java
+    reason: Accepts the request body as an unconstrained String and forwards it unchanged.
+  - symbol: VendorTicketService.updateStatus
+    file: workorder-service/src/main/java/com/example/telecom/workorder/service/VendorTicketService.java
+    reason: Sets newStatus and saves without validation.
+  - symbol: VendorTicketService.isValidStatus
+    file: workorder-service/src/main/java/com/example/telecom/workorder/service/VendorTicketService.java
+    reason: Defines the allowed values but has no caller, so it cannot protect the update path.
+  - symbol: VendorTicketRepository.save
+    file: workorder-service/src/main/java/com/example/telecom/workorder/repository/VendorTicketRepository.java
+    reason: Persists the invalid value supplied by the service.
+
+expected_data_flow:
+  - field: status
+    route: "raw HTTP body -> updateStatus(ticketId, String) -> VendorTicket.setStatus -> repository"
+
+must_mention:
+  - The defect is missing invocation/enforcement, not an incorrect allowed-value list.
+  - Missing ticket IDs correctly produce a 404-style ApiResponse and are a separate branch.
+  - updatedTime is changed even when the status value is invalid.
+  - Mapper and response serialization faithfully expose the bad stored value and are not the root cause.
+
+must_exclude_from_impact:
+  - symbol: WorkOrderStateMachine.transition
+    reason: Validates WorkOrderStatus, not VendorTicket's String status.
+  - symbol: VendorTicketMapper.toResponse
+    reason: Observes the invalid state but does not create it.
+
+recommended_validation:
+  - mvn -pl workorder-service -am test -Dtest=VendorTicketServiceTest
+  - Add service and controller tests asserting NOT_A_STATUS is rejected and repository state/updatedTime remain unchanged.
+

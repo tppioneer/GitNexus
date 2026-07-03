@@ -1,0 +1,52 @@
+id: qwenpaw-case-c-downloads-data-flow
+name: QwenPaw website downloads metadata data flow
+level: L2
+task_type: flow_tracing
+repo: QwenPaw
+status: draft-ground-truth
+
+prompt: |
+  请分析 QwenPaw website 中 `/downloads` 页面从路由进入到下载卡片渲染的完整数据流。
+  重点说明：
+  1. React Router 如何把 `/downloads` 映射到 Downloads 页面；
+  2. Downloads 页面如何获取 site config 和 docsPath；
+  3. CDN metadata 的 index、desktop index、plugins index 如何 fetch；
+  4. 桌面端与插件下载数据如何分组、排序、选择 latest stable；
+  5. 多语言字段和操作系统推荐标记如何影响渲染；
+  6. 如果要修改下载元数据结构，前端需要检查哪些类型和函数。
+  不要修改代码，只输出路由链、数据流、关键符号、风险和验证建议。
+
+tool_policies:
+  grep:
+    allowed:
+      - rg
+      - read_file
+    forbidden:
+      - gitnexus.query
+      - gitnexus.context
+      - gitnexus.impact
+      - gitnexus.detect_changes
+  graph:
+    allowed:
+      - gitnexus.query
+      - gitnexus.context
+      - gitnexus.impact
+      - read_file
+    forbidden:
+      - broad_rg_scan
+  mixed:
+    allowed:
+      - rg
+      - read_file
+      - gitnexus.query
+      - gitnexus.context
+      - gitnexus.impact
+
+suggested_queries:
+  grep:
+    - 'rg "Downloads|/downloads|loadDownloads|DesktopIndex|FileMetadata|compareVersionDesc|latestFileIdByPluginId" website/src'
+    - 'rg "loadSiteConfig|SiteConfigProvider|docsPath|CDN_BASE" website/src'
+  graph:
+    - 'query({search_query: "Downloads page CDN metadata data flow"})'
+    - 'context({name: "Downloads"})'
+    - 'context({name: "compareVersionDesc"})'

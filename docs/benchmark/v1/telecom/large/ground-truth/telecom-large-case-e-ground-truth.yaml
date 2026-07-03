@@ -1,0 +1,67 @@
+case: telecom-large-case-e
+ground_truth_type: impact_analysis
+truth_version: "2.0"
+project_scale: "50K"
+expected_files:
+  - file: notification-service/.../channel/SmsNotificationChannel.java
+  - file: notification-service/.../channel/EmailNotificationChannel.java
+  - file: notification-service/.../channel/WeComNotificationChannel.java
+  - file: notification-service/.../service/NotificationService.java
+  - file: notification-service/.../service/NotificationRetryService.java
+  - file: notification-service/.../service/NotificationBatchService.java
+  - file: notification-service/src/test/java/.../NotificationChannelSendTest.java
+  - file: notification-service/src/test/java/.../NotificationServiceTest.java
+  - file: notification-service/src/test/java/.../NotificationRetryServiceTest.java
+expected_symbols:
+  - symbol: SmsNotificationChannel
+  - symbol: EmailNotificationChannel
+  - symbol: WeComNotificationChannel
+  - symbol: NotificationService
+  - symbol: NotificationRetryService
+  - symbol: NotificationBatchService
+  - symbol: NotificationChannelSendTest
+  - symbol: NotificationServiceTest
+  - symbol: NotificationRetryServiceTest
+
+target:
+  interface: NotificationChannel
+  method: send
+  change: "add DeliveryContext context parameter"
+
+must_include:
+  implementations:
+    - symbol: SmsNotificationChannel
+      file: notification-service/.../channel/SmsNotificationChannel.java
+    - symbol: EmailNotificationChannel
+      file: notification-service/.../channel/EmailNotificationChannel.java
+    - symbol: WeComNotificationChannel
+      file: notification-service/.../channel/WeComNotificationChannel.java
+  callers:
+    - symbol: NotificationService
+      file: notification-service/.../service/NotificationService.java
+    - symbol: NotificationRetryService
+      file: notification-service/.../service/NotificationRetryService.java
+    - symbol: NotificationBatchService
+      file: notification-service/.../service/NotificationBatchService.java
+  tests:
+    - symbol: NotificationChannelSendTest
+      file: notification-service/src/test/java/.../NotificationChannelSendTest.java
+    - symbol: NotificationServiceTest
+      file: notification-service/src/test/java/.../NotificationServiceTest.java
+    - symbol: NotificationRetryServiceTest
+      file: notification-service/src/test/java/.../NotificationRetryServiceTest.java
+
+must_exclude:
+  - symbol: DeviceClient.send
+    reason: "Fake client, not NotificationChannel"
+    file: ops-gateway-service/.../client/DeviceClient.java
+  - symbol: AlarmClient.send
+    reason: "Fake client, not NotificationChannel"
+    file: ops-gateway-service/.../client/AlarmClient.java
+  - symbol: WorkOrderClient.send
+    reason: "Fake client, not NotificationChannel"
+    file: ops-gateway-service/.../client/WorkOrderClient.java
+
+verification:
+  - mvn -pl notification-service test
+  - mvn test

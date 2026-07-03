@@ -1,0 +1,58 @@
+case: telecom-large-case-i
+ground_truth_type: impact_analysis
+truth_version: "2.0"
+project_scale: "50K"
+expected_files:
+  - file: alarm-engine-service/.../service/MaintenanceWindowService.java
+  - file: alarm-engine-service/.../repository/MaintenanceWindowRepository.java
+  - file: alarm-engine-service/.../service/SuppressionRuleEvaluator.java
+  - file: alarm-engine-service/.../service/AlarmEscalationService.java
+  - file: alarm-engine-service/.../service/AlarmExportService.java
+  - file: ops-gateway-service/.../service/DashboardAggregationService.java
+expected_symbols:
+  - symbol: MaintenanceWindowService
+  - symbol: MaintenanceWindowRepository
+  - symbol: SuppressionRuleEvaluator
+  - symbol: AlarmEscalationService
+  - symbol: AlarmExportService
+  - symbol: DashboardAggregationService
+
+note: >
+  核心答案与 12K 版本一致。新增模块的 evaluate 方法不应被纳入影响面。
+
+target:
+  service: AlarmSuppressionService
+  method: shouldSuppress
+
+must_include:
+  - symbol: MaintenanceWindowService
+    file: alarm-engine-service/.../service/MaintenanceWindowService.java
+  - symbol: MaintenanceWindowRepository
+    file: alarm-engine-service/.../repository/MaintenanceWindowRepository.java
+  - symbol: SuppressionRuleEvaluator
+    file: alarm-engine-service/.../service/SuppressionRuleEvaluator.java
+    note: "evaluate noise — NOT RuleEvaluator"
+  - symbol: AlarmEscalationService
+    file: alarm-engine-service/.../service/AlarmEscalationService.java
+  - symbol: AlarmExportService
+    file: alarm-engine-service/.../service/AlarmExportService.java
+  - symbol: DashboardAggregationService
+    file: ops-gateway-service/.../service/DashboardAggregationService.java
+
+tests_affected:
+  - AlarmSuppressionServiceTest
+  - AlarmEscalationServiceTest
+  - AlarmExportServiceTest
+
+must_exclude:
+  - symbol: RuleEvaluator.evaluate
+    reason: "Case B target interface, not related to suppression"
+    file: alarm-engine-service/.../rule/RuleEvaluator.java
+  - symbol: DeviceDeprecationPolicy.evaluate
+    reason: "Unrelated policy in device-lifecycle-service"
+    file: device-lifecycle-service/.../policy/DeviceDeprecationPolicy.java
+  - symbol: SlaBreachPolicy.evaluate
+    reason: "Unrelated policy in sla-engine-service"
+    file: sla-engine-service/.../monitor/SlaBreachPolicy.java
+
+verification: mvn test

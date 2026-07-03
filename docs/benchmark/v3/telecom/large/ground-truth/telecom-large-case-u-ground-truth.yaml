@@ -1,0 +1,56 @@
+case_id: telecom-large-case-u-dispatch-assignment-flow
+task_type: flow_tracing
+ground_truth_status: reviewed
+
+expected_entrypoints:
+  - symbol: DispatchController.assign
+    file: dispatch-service/src/main/java/com/example/telecom/dispatch/controller/DispatchController.java
+    reason: POST /api/dispatch/assign extracts workOrderId and maps DomainException into ApiResponse.
+
+expected_symbols:
+  - symbol: DispatchOrchestrationService.dispatch
+    file: dispatch-service/src/main/java/com/example/telecom/dispatch/service/DispatchOrchestrationService.java
+    reason: Creates and initially saves a PENDING DispatchOrder and handles the no-operator branch.
+  - symbol: OperatorAvailabilityService.getAvailableOperators
+    file: dispatch-service/src/main/java/com/example/telecom/dispatch/service/OperatorAvailabilityService.java
+    reason: Supplies the initial availability gate and engine candidates.
+  - symbol: DispatchEngine.dispatch
+    file: dispatch-service/src/main/java/com/example/telecom/dispatch/engine/DispatchEngine.java
+    reason: Validates order, evaluates rules, filters candidates, scores and assigns.
+  - symbol: DispatchRuleRegistry.evaluateAll
+    file: dispatch-service/src/main/java/com/example/telecom/dispatch/rule/DispatchRuleRegistry.java
+    reason: Runs polymorphic dispatch rules over DispatchContext.
+  - symbol: DispatchEngine.findCandidates
+    file: dispatch-service/src/main/java/com/example/telecom/dispatch/engine/DispatchEngine.java
+    reason: Filters operators by skill, proximity, load and availability scores.
+  - symbol: DispatchEngine.selectBestCandidate
+    file: dispatch-service/src/main/java/com/example/telecom/dispatch/engine/DispatchEngine.java
+    reason: Selects the highest scored remaining candidate.
+  - symbol: DispatchOrchestrationService.executeDispatch
+    file: dispatch-service/src/main/java/com/example/telecom/dispatch/service/DispatchOrchestrationService.java
+    reason: Saves processed order, writes history, publishes assignment and maps response.
+  - symbol: DispatchEventPublisher.publishAssigned
+    file: dispatch-service/src/main/java/com/example/telecom/dispatch/event/DispatchEventPublisher.java
+    reason: Emits the successful assignment event.
+
+expected_call_chains:
+  - route: "POST /api/dispatch/assign -> DispatchController.assign -> DispatchOrchestrationService.dispatch"
+  - route: "dispatch -> availability gate -> DispatchEngine.dispatch -> evaluateRules -> findCandidates -> scoreCandidates -> selectBestCandidate -> executeAssignment"
+  - route: "executeDispatch -> DispatchRepository.save -> recordHistory -> publishAssigned -> DispatchMapper.toResponse"
+
+must_mention:
+  - Orchestration saves PENDING before availability and saves FAILED plus history when no operator exists.
+  - DispatchEngine logs failed rules but does not stop candidate selection solely because a rule result failed.
+  - Validation failure or no engine candidate returns a non-assigned order that executeDispatch still saves and publishes as assigned; this is a behavioral risk to call out.
+  - The orchestration-level scoreAndSelect result is logged but not passed to DispatchEngine, which performs its own selection.
+
+must_exclude_from_impact:
+  - symbol: DispatchOptimizer.optimizeSchedule
+    reason: Batch scheduling utility is not called by the single assign endpoint.
+  - symbol: DispatchRuleService.evaluate
+    reason: Rule administration/evaluation endpoint is separate from DispatchEngine's registry path unless explicitly called.
+
+recommended_validation:
+  - mvn -pl dispatch-service -am test
+  - Add controller/orchestration tests for success, no available operators, rule failure, validation failure and no engine candidates, asserting repository/history/event side effects.
+

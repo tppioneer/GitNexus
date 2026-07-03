@@ -1,0 +1,57 @@
+case: telecom-large-case-f
+ground_truth_type: flow_tracing
+truth_version: "2.0"
+project_scale: "50K"
+expected_files:
+  - file: ops-gateway-service/.../controller/DashboardDrilldownController.java
+  - file: ops-gateway-service/.../service/DashboardDrilldownService.java
+  - file: ops-gateway-service/.../client/DeviceClient.java
+  - file: ops-gateway-service/.../client/AlarmClient.java
+  - file: ops-gateway-service/.../client/WorkOrderClient.java
+expected_symbols:
+  - symbol: DashboardDrilldownController.getDrilldown
+  - symbol: GET /api/dashboard/regions/{regionCode}/drilldown
+  - symbol: DashboardDrilldownService.drillDownRegion
+  - symbol: DeviceClient.fetchDeviceSummary
+  - symbol: AlarmClient.fetchActiveAlarmSummary
+  - symbol: WorkOrderClient.fetchOpenWorkOrderSummary
+
+note: >
+  核心调用链不变。50K 规模下 ops-gateway-service 增加了
+  DashboardTrendService、DashboardHealthScoreService 等查询路径，
+  以及 DashboardExportService 等导出路径，不应与 drill-down 混淆。
+
+expected_call_chain:
+  - step: 1
+    symbol: DashboardDrilldownController.getDrilldown
+    route: GET /api/dashboard/regions/{regionCode}/drilldown
+    file: ops-gateway-service/.../controller/DashboardDrilldownController.java
+  - step: 2
+    symbol: DashboardDrilldownService.drillDownRegion
+    file: ops-gateway-service/.../service/DashboardDrilldownService.java
+  - step: 3
+    symbol: DeviceClient.fetchDeviceSummary
+    file: ops-gateway-service/.../client/DeviceClient.java
+  - step: 4
+    symbol: AlarmClient.fetchActiveAlarmSummary
+    file: ops-gateway-service/.../client/AlarmClient.java
+  - step: 5
+    symbol: WorkOrderClient.fetchOpenWorkOrderSummary
+    file: ops-gateway-service/.../client/WorkOrderClient.java
+
+not_in_chain:
+  - DashboardTrendController
+  - DashboardHealthScoreService
+  - DashboardAlarmRankingService
+  - DashboardExportService
+  - DeviceHealthEvaluator (separate scoring flow)
+  - RegionHealthEvaluator (separate scoring flow)
+
+region_code_noise:
+  - Region.regionCode
+  - OperatorUser.regionCode
+  - RegionFilterRequest.regionCode
+  - NetworkSlice.regionCode
+  - TopologyNode.regionCode
+
+verification: mvn -pl ops-gateway-service test

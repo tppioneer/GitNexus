@@ -1,0 +1,68 @@
+case: telecom-large-case-g
+ground_truth_type: impact_analysis
+truth_version: "2.0"
+project_scale: "50K"
+expected_files:
+  - file: device-collector-service/.../adapter/HuaweiVendorAdapter.java
+  - file: device-collector-service/.../adapter/ZteVendorAdapter.java
+  - file: device-collector-service/.../adapter/FiberHomeVendorAdapter.java
+  - file: device-collector-service/.../adapter/GenericSnmpVendorAdapter.java
+  - file: device-collector-service/.../service/MetricCollectorService.java
+  - file: device-collector-service/.../adapter/VendorAdapterRegistry.java
+  - file: device-collector-service/src/test/java/.../HuaweiVendorAdapterTest.java
+  - file: device-collector-service/src/test/java/.../VendorAdapterRegistryTest.java
+  - file: device-collector-service/src/test/java/.../MetricCollectorServiceTest.java
+  - file: device-collector-service/src/test/java/.../VendorAdapterNormalizationTest.java
+expected_symbols:
+  - symbol: HuaweiVendorAdapter
+  - symbol: ZteVendorAdapter
+  - symbol: FiberHomeVendorAdapter
+  - symbol: GenericSnmpVendorAdapter
+  - symbol: MetricCollectorService
+  - symbol: VendorAdapterRegistry
+  - symbol: HuaweiVendorAdapterTest
+  - symbol: VendorAdapterRegistryTest
+  - symbol: MetricCollectorServiceTest
+  - symbol: VendorAdapterNormalizationTest
+
+target:
+  interface: VendorAdapter
+  method: normalizeRawMetric
+  change: "add VendorContext context parameter"
+
+must_include:
+  implementations:
+    - symbol: HuaweiVendorAdapter
+      file: device-collector-service/.../adapter/HuaweiVendorAdapter.java
+    - symbol: ZteVendorAdapter
+      file: device-collector-service/.../adapter/ZteVendorAdapter.java
+    - symbol: FiberHomeVendorAdapter
+      file: device-collector-service/.../adapter/FiberHomeVendorAdapter.java
+    - symbol: GenericSnmpVendorAdapter
+      file: device-collector-service/.../adapter/GenericSnmpVendorAdapter.java
+  callers:
+    - symbol: MetricCollectorService
+      file: device-collector-service/.../service/MetricCollectorService.java
+    - symbol: VendorAdapterRegistry
+      file: device-collector-service/.../adapter/VendorAdapterRegistry.java
+  tests:
+    - symbol: HuaweiVendorAdapterTest
+      file: device-collector-service/src/test/java/.../HuaweiVendorAdapterTest.java
+    - symbol: VendorAdapterRegistryTest
+      file: device-collector-service/src/test/java/.../VendorAdapterRegistryTest.java
+    - symbol: MetricCollectorServiceTest
+      file: device-collector-service/src/test/java/.../MetricCollectorServiceTest.java
+    - symbol: VendorAdapterNormalizationTest
+      file: device-collector-service/src/test/java/.../VendorAdapterNormalizationTest.java
+
+must_exclude:
+  - symbol: VendorAlarmAdapter.normalize
+    reason: "Different interface in same module, not VendorAdapter"
+    file: device-collector-service/.../adapter/VendorAlarmAdapter.java
+  - symbol: DeviceMetricNormalizer.normalize
+    reason: "Different class, not related to VendorAdapter"
+    file: device-collector-service/.../service/DeviceMetricNormalizer.java
+
+verification:
+  - mvn -pl device-collector-service test
+  - mvn test

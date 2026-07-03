@@ -1,0 +1,54 @@
+case_id: qwenpaw-case-y-token-usage-flush-retry-bug
+task_type: bug_localization
+ground_truth_status: reviewed
+
+expected_entrypoints:
+  - symbol: TokenUsageManager.record
+    file: src/qwenpaw/token_usage/manager.py
+    reason: Enqueues a usage event that becomes dirty data after the consumer applies it.
+  - symbol: TokenUsageBuffer._flush_loop
+    file: src/qwenpaw/token_usage/buffer.py
+    reason: Periodically invokes _flush_once and therefore exposes the missing-retry behavior.
+
+expected_symbols:
+  - symbol: TokenUsageBuffer._consumer_loop
+    file: src/qwenpaw/token_usage/buffer.py
+    reason: Applies queued events to _disk_cache and sets _dirty to true.
+  - symbol: TokenUsageBuffer._flush_once
+    file: src/qwenpaw/token_usage/buffer.py
+    reason: Clears _dirty before attempting the write and has no failure branch that restores it.
+  - symbol: save_data_sync
+    file: src/qwenpaw/token_usage/storage.py
+    reason: Catches OSError, logs and returns normally, so the caller cannot distinguish failure from success.
+  - symbol: TokenUsageBuffer.stop
+    file: src/qwenpaw/token_usage/buffer.py
+    reason: A forced final flush may mask the defect during graceful shutdown but cannot protect an abnormal exit.
+
+expected_root_causes:
+  - symbol: TokenUsageBuffer._flush_once
+    file: src/qwenpaw/token_usage/buffer.py
+    reason: "_dirty = False is executed before save_data_sync completes; a failed write therefore leaves the cache incorrectly marked clean."
+  - symbol: save_data_sync
+    file: src/qwenpaw/token_usage/storage.py
+    reason: "The persistence function suppresses OSError and returns no success flag or exception for _flush_once to act on."
+
+expected_failure_chain:
+  - route: "record/enqueue -> _consumer_loop -> _disk_cache updated + _dirty=true -> _flush_loop -> _flush_once"
+  - route: "_dirty=false -> save_data_sync -> OSError swallowed -> next _flush_once returns early because _dirty is false"
+
+must_mention:
+  - The in-memory cache remains queryable, so API reads can look correct while the file is stale.
+  - A new usage event sets _dirty again and can incidentally cause a later snapshot to persist all cached data; without a new event, periodic retries stop.
+  - force=True bypasses the clean check during graceful stop, but an abnormal process exit still loses the unpersisted interval.
+  - A robust contract must report write success or keep/restore dirty state only after a confirmed atomic replace.
+
+must_exclude_from_impact:
+  - symbol: TokenUsageBuffer.enqueue
+    reason: Queue-full dropping is a separate loss mode and does not explain why a failed disk write is never retried.
+  - symbol: TokenUsageManager._query
+    reason: Query aggregation reads the cache correctly and is not the persistence failure.
+
+recommended_validation:
+  - Extend tests/unit/token_usage/test_token_usage.py with a buffer containing one applied event and patch os.replace so the real save_data_sync sees one OSError, then succeeds.
+  - Invoke _flush_once twice without adding another event; assert the second call retries, os.replace is called twice, and the persisted JSON contains the original event.
+  - Cover graceful stop separately so force=True does not accidentally make the periodic-retry test pass.

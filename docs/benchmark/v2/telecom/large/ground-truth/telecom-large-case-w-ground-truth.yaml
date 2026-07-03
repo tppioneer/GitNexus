@@ -1,0 +1,65 @@
+case_id: telecom-large-case-w-device-lifecycle-data-flow
+task_type: data_flow
+ground_truth_status: reviewed
+
+expected_entrypoints:
+  - symbol: DeviceLifecycleController.register
+    file: device-lifecycle-service/src/main/java/com/example/telecom/device/lifecycle/controller/DeviceLifecycleController.java
+    reason: Accepts validated DeviceLifecycleRequest and returns a created response.
+  - symbol: DeviceLifecycleController.activate
+    file: device-lifecycle-service/src/main/java/com/example/telecom/device/lifecycle/controller/DeviceLifecycleController.java
+    reason: Representative state transition endpoint.
+
+expected_symbols:
+  - symbol: DeviceLifecycleValidator.validate
+    file: device-lifecycle-service/src/main/java/com/example/telecom/device/lifecycle/validator/DeviceLifecycleValidator.java
+    reason: Rejects invalid registration data before record construction.
+  - symbol: DeviceLifecycleService.register
+    file: device-lifecycle-service/src/main/java/com/example/telecom/device/lifecycle/service/DeviceLifecycleService.java
+    reason: Copies request fields into a REGISTERED LifecycleRecord, saves, emits and audits.
+  - symbol: LifecycleRecord
+    file: device-lifecycle-service/src/main/java/com/example/telecom/device/lifecycle/model/LifecycleRecord.java
+    reason: Stores identity, descriptive/network fields and internal previous/current state.
+  - symbol: DeviceLifecycleService.activate
+    file: device-lifecycle-service/src/main/java/com/example/telecom/device/lifecycle/service/DeviceLifecycleService.java
+    reason: Validates transition, mutates previous/current state and persists timestamp.
+  - symbol: DeviceStateMachine.isValidTransition
+    file: device-lifecycle-service/src/main/java/com/example/telecom/device/lifecycle/workflow/DeviceStateMachine.java
+    reason: Defines legal internal state transitions.
+  - symbol: DeviceLifecycleEventPublisher.publishActivated
+    file: device-lifecycle-service/src/main/java/com/example/telecom/device/lifecycle/event/DeviceLifecycleEventPublisher.java
+    reason: Emits deviceId and hard-coded REGISTERED-to-ACTIVE status names.
+  - symbol: DeviceLifecycleAuditService.recordAction
+    file: device-lifecycle-service/src/main/java/com/example/telecom/device/lifecycle/service/DeviceLifecycleAuditService.java
+    reason: Persists action and performer, separate from the lifecycle event.
+  - symbol: DeviceLifecycleMapper.toResponse
+    file: device-lifecycle-service/src/main/java/com/example/telecom/device/lifecycle/mapper/DeviceLifecycleMapper.java
+    reason: Maps internal state and regionCode into the public response.
+
+expected_data_flow:
+  - field: DeviceLifecycleRequest.deviceId
+    route: "request -> LifecycleRecord -> repository -> audit/event/response"
+  - field: DeviceLifecycleRequest.regionCode
+    route: "request -> LifecycleRecord.regionCode -> DeviceLifecycleResponse.regionCode; not present in publishActivated event"
+  - field: currentState/previousState
+    route: "REGISTERED -> activate validation -> record.previousState/currentState -> common status response"
+  - field: ipAddress
+    route: "request -> LifecycleRecord only; omitted from DeviceLifecycleResponse and state event"
+
+must_mention:
+  - Registration publishes only deviceId/status through publishRegistered and does not include all request fields.
+  - Service transition validation delegates to DeviceStateMachine before repository mutation.
+  - Mapper collapses REGISTERED/FIRMWARE_UPGRADING/FAILED into PROVISIONED and SUSPENDED into MAINTENANCE.
+  - Event publisher methods use fixed previous/new strings rather than reading the mutated record.
+  - Audit and event are emitted after repository save; there is no transactional rollback shown.
+
+must_exclude_from_impact:
+  - symbol: DeviceFirmwareService
+    reason: Firmware lifecycle is separate from core device state transitions.
+  - symbol: DeviceCertificateService
+    reason: Certificate fields do not participate in this request-to-state flow.
+
+recommended_validation:
+  - mvn -pl device-lifecycle-service -am test -Dtest=DeviceLifecycleServiceTest,DeviceStateMachineTest
+  - Assert request-to-record field copies, invalid transition no-save behavior, event/audit order and response state mapping.
+

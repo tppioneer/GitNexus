@@ -1,0 +1,17 @@
+id: telecom-large-case-x-sla-breach-data-flow
+name: Telecom Large SLA metric to breach data flow
+level: L2
+task_type: data_flow
+repo: telecom-ops-platform-large
+status: reviewed
+
+prompt: |
+  请追踪某个 SLA contract 下的一条 metric snapshot 如何被判断为 breach，并进一步形成 breach 记录、事件以及 contract 状态变化。
+  说明不同 metricType 的 threshold 来源、重复 breach 的抑制、无数据或待激活合同的分支，以及 breach 被解决后的反向状态更新。
+  不要修改代码，只输出有证据支持的数据流、业务条件和验证建议。
+
+extra_desc: |
+  人工审阅提示，不进入公开载荷：核对 Contract/Metric repositories、BreachPolicy、checkBreach/getThresholdForMetric、Breach repository、SlaEventPublisher 和 resolveBreach。
+
+ground_truth: docs/benchmark/v2/telecom/large/ground-truth/telecom-large-case-x-ground-truth.yaml
+

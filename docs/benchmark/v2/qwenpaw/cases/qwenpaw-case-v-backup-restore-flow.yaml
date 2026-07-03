@@ -1,0 +1,17 @@
+id: qwenpaw-case-v-backup-restore-flow
+name: QwenPaw trusted backup restore orchestration flow
+level: L2
+task_type: flow_tracing
+repo: QwenPaw
+status: reviewed
+
+prompt: |
+  管理员通过备份恢复 API 恢复部分 agent workspace，并可能同时恢复 secrets 或 skill pool。
+  请分析从 HTTP 请求到文件恢复完成的执行流程，重点解释安全校验、运行中资源的停启、并发保护、失败恢复以及最终响应之间的先后约束。
+  不要修改代码，只输出有证据支持的调用链、失败路径、风险和验证建议。
+
+extra_desc: |
+  Case 设计与人工审阅提示，不进入模型公开载荷：确认 trust/version preflight 必须先于 stop，secrets/skill pool 会扩大停止集合，浏览器按 workspace 停止，restore 同时受 async/process lock 保护，finally 后台 preload。
+
+ground_truth: docs/benchmark/v2/qwenpaw/ground-truth/qwenpaw-case-v-backup-restore-flow-ground-truth.yaml
+

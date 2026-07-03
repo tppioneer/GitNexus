@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gitnexus.dev/schemas/ai-coding-benchmark/scoring-input-v2.json",
+  "title": "AI Coding Benchmark Automatic Score",
+  "type": "object",
+  "required": ["case_id", "run_result", "golden_answer", "score", "automatic_total", "effective_total", "dimension_points", "item_scores"],
+  "properties": {
+    "case_id": {"type": "string"},
+    "run_id": {"type": ["string", "null"]},
+    "run_result": {"type": "string"},
+    "golden_answer": {"type": "string"},
+    "automatic_total": {"type": "number", "minimum": 0, "maximum": 100},
+    "effective_total": {"type": "number", "minimum": 0, "maximum": 100},
+    "review_status": {"enum": ["not_reviewed", "draft", "completed", "stale", "invalid"]},
+    "review_outcome": {"type": ["string", "null"], "enum": ["accepted", "adjusted", null]},
+    "dimension_points": {
+      "type": "object",
+      "required": ["location", "symbols", "call_edges", "behavior_facts", "evidence", "noise"],
+      "properties": {
+        "location": {"type": "number", "minimum": 0, "maximum": 15},
+        "symbols": {"type": "number", "minimum": 0, "maximum": 20},
+        "call_edges": {"type": "number", "minimum": 0, "maximum": 25},
+        "behavior_facts": {"type": "number", "minimum": 0, "maximum": 20},
+        "evidence": {"type": "number", "minimum": 0, "maximum": 10},
+        "noise": {"type": "number", "minimum": 0, "maximum": 10}
+      }
+    },
+    "item_scores": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["item_id", "dimension", "item_type", "max_points", "automatic_credit", "automatic_points", "outcome", "match_source", "expected", "evidence"],
+        "properties": {
+          "item_id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"},
+          "dimension": {"enum": ["location", "symbols", "call_edges", "behavior_facts", "evidence", "noise"]},
+          "item_type": {"type": "string"},
+          "max_points": {"type": "number", "minimum": 0},
+          "automatic_credit": {"type": "number", "enum": [0, 0.25, 0.4, 0.5, 0.8, 1]},
+          "automatic_points": {"type": "number", "minimum": 0},
+          "outcome": {"enum": ["miss", "partial", "hit"]},
+          "match_source": {"enum": ["structured_exact", "structured_short_symbol", "explicit_text_relation", "proximity_candidate", "not_found", "exact_answer", "lexical_fact", "not_present", "lexical_presence"]},
+          "expected": {"type": "object"},
+          "evidence": {"type": "array"}
+        }
+      }
+    },
+    "score": {"type": "object"},
+    "judge_notes": {"type": "array", "items": {"type": "string"}}
+  }
+}

@@ -1,0 +1,55 @@
+case: telecom-large-case-n-vendor-collaboration-flow
+level: L1 - flow_tracing
+title: "厂商协同单全流程追踪"
+
+description: >
+  50,000 行规模特有的 case。追踪厂商协同单从创建到关闭的完整执行流。
+  涉及 vendor-collaboration-service 和 workorder-service 的交互。
+
+task: >
+  请分析厂商协同单从 POST /api/vendor/tickets 创建，
+  经厂商评估、SLA 跟踪、反馈到关闭的完整调用链。
+
+entry_point:
+  controller: VendorTicketController
+  method: createTicket
+  route: POST /api/vendor/tickets
+
+key_components:
+  - VendorTicketService
+  - VendorSlaTrackingService
+  - VendorFeedbackService
+  - VendorEvaluationService
+  - VendorEvaluator
+  - VendorEvaluatorRegistry
+  - VendorCollaborationStateMachine
+  - VendorTicketEventPublisher
+
+interference:
+  - "WorkOrderFlowService (workorder-service, different flow)"
+  - "AutoWorkOrderService (workorder-service, different flow)"
+  - "DispatchEngine (dispatch-service, different flow)"
+
+graph_queries:
+  - 'query({search_query: "vendor ticket collaboration flow"})'
+  - 'context({name: "VendorTicketController"})'
+  - 'context({name: "VendorTicketService"})'
+
+grep_searches:
+  - rg "VendorTicketController|createTicket"
+  - rg "VendorTicketService|VendorSlaTrackingService|VendorFeedbackService"
+  - rg "VendorEvaluator|VendorCollaborationStateMachine"
+
+ground_truth: docs/benchmark/v1/telecom/large/ground-truth/telecom-large-case-n-ground-truth.yaml
+
+scoring:
+  must_identify_side_effects:
+    - 厂商协同单创建
+    - 厂商 SLA 跟踪启动
+    - 厂商评估（VendorEvaluator 多态调用）
+    - 状态机流转
+    - 厂商协同事件发布
+  penalty_items:
+    - 把 WorkOrderFlowService 纳入厂商链
+    - 把 DispatchEngine 纳入厂商链
+    - 把 AutoWorkOrderService 纳入厂商链

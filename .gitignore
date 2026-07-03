@@ -12,6 +12,7 @@ dist/
 .idea/
 *.swp
 *.swo
+.codex
 
 # OS
 .DS_Store
@@ -68,8 +69,7 @@ gitnexus-web/test-results/
 eval/.coverage
 eval/.hypothesis/
 
-# Local docs
-docs/
+# Benchmark runner outputs (tracked — see docs/benchmark/shared/)
 
 gitnexus/test/fixtures/mini-repo/*.md
 gitnexus/test/fixtures/mini-repo/.claude

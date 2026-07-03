@@ -1,0 +1,52 @@
+case: telecom-large-case-d
+ground_truth_type: state_machine_change
+truth_version: "2.0"
+project_scale: "50K"
+
+note: >
+  核心变更与 12K 版本一致。50K 规模下增加了两个额外状态机
+  （DeviceStateMachine, VendorCollaborationStateMachine），
+  它们都有 transition 方法，可能被 grep 误检。
+
+target:
+  state_machine: WorkOrderStateMachine
+  new_state: WAITING_VENDOR
+
+existing_states:
+  - CREATED, ASSIGNED, PROCESSING, WAITING_VENDOR, RESOLVED, CLOSED, ESCALATED, CANCELLED
+
+new_transitions:
+  - "PROCESSING -> WAITING_VENDOR"
+  - "WAITING_VENDOR -> PROCESSING"
+  - "WAITING_VENDOR -> RESOLVED"
+  - "WAITING_VENDOR -> ESCALATED"
+
+files_to_modify:
+  - common-domain/.../WorkOrderStatus.java (add WAITING_VENDOR)
+  - workorder-service/.../WorkOrderStateMachine.java (add transitions)
+  - workorder-service/.../controller/WorkOrderFlowController.java (add WAITING_VENDOR case)
+  - workorder-service/.../WorkOrderFixtureFactory.java (add fixture method)
+
+related_services:
+  - WaitingVendorPolicy
+  - VendorTicketService
+  - WorkOrderSlaBreachService
+  - WorkOrderBulkActionService
+
+tests_affected:
+  - WorkOrderStateMachineTest
+  - WorkOrderStateMachineWaitingVendorTest
+
+must_not_modify:
+  - symbol: DeviceStateMachine
+    reason: "Different state machine in device-lifecycle-service, not related"
+    file: device-lifecycle-service/.../workflow/DeviceStateMachine.java
+  - symbol: VendorCollaborationStateMachine
+    reason: "Different state machine in vendor-collaboration-service, not related"
+    file: vendor-collaboration-service/.../workflow/VendorCollaborationStateMachine.java
+
+transition_noise:
+  - "DeviceStateMachine.transition (device-lifecycle)"
+  - "VendorCollaborationStateMachine.transition (vendor-collaboration)"
+
+verification: mvn test

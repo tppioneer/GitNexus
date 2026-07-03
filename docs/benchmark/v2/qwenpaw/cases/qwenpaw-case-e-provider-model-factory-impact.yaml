@@ -1,0 +1,20 @@
+id: qwenpaw-case-e-provider-model-factory-impact
+name: QwenPaw provider chat-model factory contract impact
+level: L2
+task_type: impact_analysis
+repo: QwenPaw
+status: draft-ground-truth
+
+prompt: |
+  为了允许调用方传入本次模型运行所需的动态选项，计划给
+  Provider.get_chat_model_instance(model_id) 增加一个必填的 runtime_options 参数。
+  请分析这个接口变化会影响哪些实现、继承关系、生产调用路径和测试，并排除无关的同名方法。
+  不要修改代码，只输出有证据支持的影响分析、风险和验证建议。
+
+extra_desc: |
+  Case 设计与人工审阅提示，不进入模型公开载荷：
+  - 核对 Provider 抽象方法的直接 override。
+  - 核对 OpenAIProvider 的二级子类以及真正再次 override 的类。
+  - 检查 create_model_and_formatter 的 agent-specific 与 global fallback 两条路径。
+  - 检查 ProviderManager.get_active_chat_model 和下游 agent/memory/title/skills 使用点。
+  - 排除不属于目标影响面的同名 provider/model 方法。

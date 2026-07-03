@@ -1,0 +1,54 @@
+case: telecom-large-case-g-vendor-adapter-impact
+level: L2 - impact_analysis
+title: "【50K 规模】VendorAdapter.normalizeRawMetric 签名变更影响分析"
+
+description: >
+  50,000 行规模。VendorAdapter.normalizeRawMetric 签名变更。
+  新增 VendorAlarmAdapter.normalize 同名噪音。
+
+task: >
+  如果给 VendorAdapter.normalizeRawMetric(RawDeviceMetric rawMetric, DeviceInfo deviceInfo)
+  增加 VendorContext context 参数，需要同步检查哪些厂商实现、Registry、MetricCollectorService、测试和文档？
+
+target_interface:
+  name: VendorAdapter
+  method: normalizeRawMetric
+
+target_implementations:
+  - HuaweiVendorAdapter
+  - ZteVendorAdapter
+  - FiberHomeVendorAdapter
+  - GenericSnmpVendorAdapter
+
+target_callers:
+  - MetricCollectorService
+  - VendorAdapterRegistry
+
+noise_normalize_methods:
+  - "VendorAlarmAdapter.normalize (different interface in device-collector)"
+  - "DeviceMetricNormalizer.normalize (different class)"
+  - "AlarmTemplateVariableResolver.resolve (different module, not normalize)"
+  - "WorkOrderTemplateVariableResolver.resolve (different module)"
+
+graph_queries:
+  - 'impact({target: "normalizeRawMetric", direction: "upstream"})'
+  - 'context({name: "VendorAdapter"})'
+  - 'query({search_query: "vendor adapter normalize"})'
+
+grep_searches:
+  - rg "interface VendorAdapter|class .*VendorAdapter|normalizeRawMetric"
+  - rg "VendorAdapterRegistry|MetricCollectorService"
+  - rg "RawDeviceMetric|VendorContext"
+
+ground_truth: docs/benchmark/v1/telecom/large/ground-truth/telecom-large-case-g-ground-truth.yaml
+
+risk_level: MEDIUM
+
+scoring:
+  must_identify:
+    - 4 个 VendorAdapter 实现类
+    - MetricCollectorService、VendorAdapterRegistry
+    - 对应测试类
+  penalty_items:
+    - 把 VendorAlarmAdapter.normalize 纳入影响面
+    - 把 DeviceMetricNormalizer.normalize 纳入影响面

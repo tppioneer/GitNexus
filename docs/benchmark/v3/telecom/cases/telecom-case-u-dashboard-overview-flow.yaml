@@ -1,0 +1,17 @@
+id: telecom-case-u-dashboard-overview-flow
+name: Telecom dashboard overview aggregation flow
+level: L2
+task_type: flow_tracing
+repo: telecom-ops-platform
+status: reviewed
+
+prompt: |
+  运维人员请求 dashboard overview 时，页面需要同时返回设备健康、活动告警和未关闭工单的汇总。
+  请从 HTTP 入口追踪这三个分支如何查询、聚合并组装为最终响应，同时说明审计记录和 regionCode 在流程中的作用。
+  不要修改代码，只输出有证据支持的执行链、分支汇合点、风险和验证建议。
+
+extra_desc: |
+  人工审阅提示，不进入公开载荷：核对 OpsDashboardController、OpsQueryService、三个 Client、DashboardAggregationService、DashboardResponseMapper 和 GatewayAuditService。
+
+ground_truth: docs/benchmark/v3/telecom/ground-truth/telecom-case-u-ground-truth.yaml
+

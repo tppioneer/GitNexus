@@ -1,0 +1,39 @@
+id: telecom-case-f-workorder-transition-impact
+name: Telecom WorkOrderStateMachine.transition 参数变更影响分析
+level: L2
+task_type: impact_analysis
+repo: telecom-ops-platform
+status: draft-ground-truth
+
+prompt: |
+  为了支持工单状态变更的分布式追踪，需要给 WorkOrderStateMachine.transition
+  增加一个 TransitionContext 参数，让每一次状态变更都能关联到触发源和传播链路。
+
+  请分析这个签名变更的完整生产影响面、行为风险以及需要同步更新的测试。
+  注意区分仓库中其他同名 transition 方法。不要修改代码，只输出影响分析。
+
+extra_desc: |
+  Case 设计与人工审阅提示，不进入模型公开载荷：
+  - 核对 Controller、批量操作、自动工单和升级路径中的生产调用方。
+  - 检查 transition 的状态更新副作用和后续事件发布逻辑。
+  - 检查相应测试，并排除仓库中其他同名 transition 方法。
+
+graph_queries:
+  - 'context({name: "WorkOrderStateMachine"})'
+  - 'impact({target: "transition", direction: "upstream"})'
+
+grep_searches:
+  - rg "WorkOrderStateMachine|transition\("
+  - rg "WorkOrderFlowService|WorkOrderBulkActionService|AutoWorkOrderService"
+
+
+ground_truth: docs/benchmark/v2/telecom/ground-truth/telecom-case-f-ground-truth.yaml
+
+risk_level: CRITICAL
+
+scoring:
+  must_identify:
+    - WorkOrderFlowService 中 6 个直接调用方法
+    - Controller、批量操作、自动工单和升级路径
+    - transition 的状态更新副作用和 WorkOrderEventPublisher 的后续发布
+    - WorkOrderStateMachineTest 与 WAITING_VENDOR 测试

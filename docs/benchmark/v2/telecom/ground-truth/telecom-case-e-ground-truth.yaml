@@ -1,0 +1,62 @@
+case_id: telecom-case-e-assignee-selector-impact
+task_type: impact_analysis
+
+target:
+  symbol: AssigneeSelector.select
+  file: workorder-service/src/main/java/com/example/telecom/workorder/assignment/AssigneeSelector.java
+  current_signature: "SelectResult select(WorkOrder workOrder, List<OperatorUser> candidates)"
+  proposed_signature: "SelectResult select(WorkOrder workOrder, List<OperatorUser> candidates, AssignmentContext context)"
+  graph_risk: CRITICAL
+  graph_blast_radius:
+    direct_callers: 5
+    total_impacted_with_depth_4: 23
+    affected_process_groups: 6
+
+expected_symbols:
+  - symbol: RegionBasedAssigneeSelector.select
+    file: workorder-service/.../assignment/RegionBasedAssigneeSelector.java
+    reason: Region-based implementation of AssigneeSelector.select.
+  - symbol: SkillBasedAssigneeSelector.select
+    file: workorder-service/.../assignment/SkillBasedAssigneeSelector.java
+    reason: Skill-based implementation of AssigneeSelector.select.
+  - symbol: LoadBalancedAssigneeSelector.select
+    file: workorder-service/.../assignment/LoadBalancedAssigneeSelector.java
+    reason: Load-balancing implementation, also the registry fallback.
+  - symbol: AssigneeSelectorRegistry.resolve
+    file: workorder-service/.../assignment/AssigneeSelectorRegistry.java
+    reason: Resolves by strategy and falls back to LoadBalancedAssigneeSelector.
+  - symbol: WorkOrderAssignmentService.assign
+    file: workorder-service/.../service/WorkOrderAssignmentService.java
+    reason: Direct interface-typed caller; resolves RegionBased and invokes select.
+
+indirect_entrypoints:
+  - symbol: WorkOrderFlowService.assign
+    chain: "WorkOrderFlowService.assign -> WorkOrderAssignmentService.assign -> AssigneeSelector.select"
+    file: workorder-service/.../workflow/WorkOrderFlowService.java
+  - symbol: AutoWorkOrderService.createForAlarm
+    chain: "AutoWorkOrderService.createForAlarm -> WorkOrderFlowService.assign -> WorkOrderAssignmentService.assign"
+    file: workorder-service/.../service/AutoWorkOrderService.java
+  - symbol: AlarmEventConsumer.onAlarmCreated
+    chain: "AlarmEventConsumer.onAlarmCreated -> AutoWorkOrderService.createForAlarm"
+    file: workorder-service/.../consumer/AlarmEventConsumer.java
+  - symbol: WorkOrderBulkActionService.bulkAssign
+    chain: "WorkOrderBulkActionController.bulkAssign -> WorkOrderBulkActionService.bulkAssign -> WorkOrderFlowService.assign"
+    file: workorder-service/.../service/WorkOrderBulkActionService.java
+
+must_mention:
+  - Three real AssigneeSelector implementations must be identified.
+  - AssigneeSelectorRegistry.resolve and WorkOrderAssignmentService.assign are the dispatch/caller layer.
+  - WorkOrderFlowService, AutoWorkOrderService, bulk assignment, and alarm event entries are upstream paths.
+  - Selector tests and assignment/flow/bulk/auto-workorder tests must be covered.
+
+must_exclude_from_impact:
+  - symbol: SelectBestCandidate
+    reason: Dispatch or scoring selection is unrelated to AssigneeSelector.
+  - symbol: NotificationChannelRegistry.resolve
+    reason: Same registry pattern, different interface and module.
+  - symbol: RuleEvaluatorRegistry.resolve
+    reason: Alarm evaluation dispatch, not work-order assignment.
+
+recommended_validation:
+  - mvn -pl workorder-service test
+  - mvn test

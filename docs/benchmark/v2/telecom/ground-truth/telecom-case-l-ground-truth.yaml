@@ -1,0 +1,302 @@
+case_id: telecom-case-l-jpa-mapping
+embeddables:
+- annotation: '@Embeddable'
+  columns:
+  - annotations:
+    - '@Column(name = "window_start")'
+    field: windowStart
+  - annotations:
+    - '@Column(name = "window_end")'
+    field: windowEnd
+  - annotations:
+    - '@Column(name = "timezone")'
+    field: timezone
+  file: network-change-service/src/main/java/com/example/telecom/change/entity/ChangeWindowEmbeddable.java
+  fqn: com.example.telecom.change.entity.ChangeWindowEmbeddable
+  id: l.embeddables.changewindowembeddable
+  name: ChangeWindowEmbeddable
+entities:
+- file: network-change-service/src/main/java/com/example/telecom/change/entity/NetworkChangeEntity.java
+  fqn: com.example.telecom.change.entity.NetworkChangeEntity
+  id: l.entities.networkchangeentity
+  mappings:
+  - annotations:
+    - '@Id'
+    - '@GeneratedValue(strategy = GenerationType.IDENTITY)'
+    column: id (implicit)
+    field: id
+  - annotations:
+    - '@Column(name = "change_id", nullable = false, unique = true)'
+    field: changeId
+  - annotations:
+    - '@Column(name = "title", nullable = false)'
+    field: title
+  - annotations:
+    - '@Column(name = "region_code")'
+    field: regionCode
+  - annotations:
+    - '@Enumerated(EnumType.STRING)'
+    - '@Column(name = "device_family")'
+    field: deviceFamily
+  - annotations:
+    - '@Enumerated(EnumType.STRING)'
+    - '@Column(name = "risk_level")'
+    field: risk
+  - annotations:
+    - '@Enumerated(EnumType.STRING)'
+    - '@Column(name = "status")'
+    field: status
+  - annotations:
+    - '@Column(name = "created_at")'
+    field: createdAt
+  - annotations:
+    - '@Column(name = "updated_at")'
+    field: updatedAt
+  - annotations:
+    - '@Embedded'
+    field: maintenanceWindow
+    type: ChangeWindowEmbeddable
+  - annotations:
+    - '@ManyToOne(fetch = FetchType.LAZY)'
+    - '@JoinColumn(name = "approval_id")'
+    field: approval
+    type: ChangeApprovalEntity
+  - annotations:
+    - '@OneToMany(mappedBy = "change", cascade = CascadeType.ALL, orphanRemoval = true)'
+    field: steps
+    type: List<ChangeStepEntity>
+  - annotations:
+    - '@OneToMany(mappedBy = "change", cascade = CascadeType.ALL, orphanRemoval = true)'
+    field: auditRecords
+    type: List<ChangeAuditEntity>
+  - annotations:
+    - '@Version'
+    field: version
+  name: NetworkChangeEntity
+  table: network_change
+- file: network-change-service/src/main/java/com/example/telecom/change/entity/ChangeStepEntity.java
+  fqn: com.example.telecom.change.entity.ChangeStepEntity
+  id: l.entities.changestepentity
+  mappings:
+  - annotations:
+    - '@Id'
+    - '@GeneratedValue(strategy = GenerationType.IDENTITY)'
+    field: id
+  - annotations:
+    - '@Column(name = "step_order", nullable = false)'
+    field: stepOrder
+  - annotations:
+    - '@Column(name = "step_name", nullable = false)'
+    field: stepName
+  - annotations:
+    - '@Column(name = "executor_bean")'
+    field: executorBean
+  - annotations:
+    - '@Enumerated(EnumType.STRING)'
+    - '@Column(name = "status")'
+    field: status
+  - annotations:
+    - '@Column(name = "result_message")'
+    field: resultMessage
+  - annotations:
+    - '@ManyToOne(fetch = FetchType.LAZY)'
+    - '@JoinColumn(name = "change_id")'
+    field: change
+    type: NetworkChangeEntity
+  name: ChangeStepEntity
+  table: change_step
+- file: network-change-service/src/main/java/com/example/telecom/change/entity/ChangeAuditEntity.java
+  fqn: com.example.telecom.change.entity.ChangeAuditEntity
+  id: l.entities.changeauditentity
+  mappings:
+  - annotations:
+    - '@Id'
+    - '@GeneratedValue(strategy = GenerationType.IDENTITY)'
+    field: id
+  - annotations:
+    - '@Column(name = "action", nullable = false)'
+    field: action
+  - annotations:
+    - '@Enumerated(EnumType.STRING)'
+    - '@Column(name = "category")'
+    field: category
+  - annotations:
+    - '@Column(name = "operator_id")'
+    field: operatorId
+  - annotations:
+    - '@Column(name = "details")'
+    field: details
+  - annotations:
+    - '@Column(name = "recorded_at")'
+    field: recordedAt
+  - annotations:
+    - '@Column(name = "success")'
+    field: success
+  - annotations:
+    - '@ManyToOne(fetch = FetchType.LAZY)'
+    - '@JoinColumn(name = "change_id")'
+    field: change
+    type: NetworkChangeEntity
+  name: ChangeAuditEntity
+  table: change_audit
+- file: network-change-service/src/main/java/com/example/telecom/change/entity/ChangeApprovalEntity.java
+  fqn: com.example.telecom.change.entity.ChangeApprovalEntity
+  id: l.entities.changeapprovalentity
+  mappings:
+  - annotations:
+    - '@Id'
+    - '@GeneratedValue(strategy = GenerationType.IDENTITY)'
+    field: id
+  - annotations:
+    - '@Column(name = "approver_id", nullable = false)'
+    field: approverId
+  - annotations:
+    - '@Column(name = "approved")'
+    field: approved
+  - annotations:
+    - '@Column(name = "comment")'
+    field: comment
+  - annotations:
+    - '@Column(name = "decided_at")'
+    field: decidedAt
+  name: ChangeApprovalEntity
+  table: change_approval
+expected_edges:
+- from: ChangeAuditService.record
+  id: edge.audit-service-to-repo
+  relation: calls
+  to: ChangeAuditJpaRepository.save
+expected_entrypoints:
+- file: network-change-service/src/main/java/com/example/telecom/change/entity/NetworkChangeEntity.java
+  id: ep.network-change-entity
+  symbol: NetworkChangeEntity
+- file: network-change-service/src/main/java/com/example/telecom/change/repository/NetworkChangeJpaRepository.java
+  id: ep.network-change-jpa-repository
+  symbol: NetworkChangeJpaRepository
+expected_facts:
+- description: NetworkChangeEntity maps to table network_change with @Entity @Table(name=network_change)
+  id: fact.network-change-table
+- description: changeId field has @Column(name=change_id nullable=false unique=true)
+  id: fact.change-id-column
+- description: deviceFamily, risk, and status use @Enumerated(EnumType.STRING)
+  id: fact.enumerated-string
+- description: steps field has @OneToMany(mappedBy=change cascade=ALL orphanRemoval=true)
+  id: fact.one-to-many-steps
+- description: approval field has @ManyToOne(fetch=LAZY) @JoinColumn(name=approval_id)
+  id: fact.many-to-one-approval
+- description: maintenanceWindow uses @Embedded referencing ChangeWindowEmbeddable @Embeddable
+  id: fact.embedded-window
+- description: version field has @Version for optimistic locking
+  id: fact.version-optimistic
+- description: findByRegionCodeAndStatus is a Spring Data derived query from method name
+  id: fact.derived-query
+- description: findRiskQueue uses @Query with JPQL select c from NetworkChangeEntity c where c.risk = :risk and c.status in :statuses
+  id: fact.jpql-query
+- description: findByRegionNative uses @Query with nativeQuery=true and raw SQL
+  id: fact.native-query
+- description: ChangeRecordDto has tableName field but is NOT a JPA entity — no @Entity annotation
+  id: fact.change-record-dto-not-entity
+expected_symbols:
+- file: network-change-service/src/main/java/com/example/telecom/change/entity/ChangeStepEntity.java
+  id: sym.change-step-entity
+  symbol: ChangeStepEntity
+- file: network-change-service/src/main/java/com/example/telecom/change/entity/ChangeAuditEntity.java
+  id: sym.change-audit-entity
+  symbol: ChangeAuditEntity
+- file: network-change-service/src/main/java/com/example/telecom/change/entity/ChangeApprovalEntity.java
+  id: sym.change-approval-entity
+  symbol: ChangeApprovalEntity
+- file: network-change-service/src/main/java/com/example/telecom/change/entity/ChangeWindowEmbeddable.java
+  id: sym.change-window-embeddable
+  symbol: ChangeWindowEmbeddable
+- file: network-change-service/src/main/java/com/example/telecom/change/repository/ChangeAuditJpaRepository.java
+  id: sym.change-audit-jpa-repository
+  symbol: ChangeAuditJpaRepository
+- file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeAuditService.java
+  id: sym.change-audit-service
+  symbol: ChangeAuditService
+ground_truth_status: draft
+noise_items:
+- file: network-change-service/src/main/java/com/example/telecom/change/dto/ChangeRecordDto.java
+  id: noise.l-changerecorddto-0
+  reason: Has tableName field but is NOT a JPA entity — no @Entity annotation
+  symbol: ChangeRecordDto
+- file: network-change-service/src/main/java/com/example/telecom/change/repository/InMemoryChangeSnapshotStore.java
+  id: noise.l-inmemorychangesnapshotstore-1
+  reason: In-memory implementation — NOT a JPA repository
+  symbol: InMemoryChangeSnapshotStore
+note: 'ChangePlanService uses ChangeSnapshotStore (in-memory), NOT JPA repository directly. NetworkChangeJpaRepository is available for injection but is not directly called from the main service layer in
+  the current implementation.
+
+  '
+recommended_validation:
+- mvn -pl network-change-service -am test -Dtest=CaseLJpaMappingTest
+repositories:
+- entity: NetworkChangeEntity
+  extends: JpaRepository<NetworkChangeEntity, Long>
+  file: network-change-service/src/main/java/com/example/telecom/change/repository/NetworkChangeJpaRepository.java
+  fqn: com.example.telecom.change.repository.NetworkChangeJpaRepository
+  id_type: Long
+  name: NetworkChangeJpaRepository
+  queries:
+  - method: findByRegionCodeAndStatus
+    signature: List<NetworkChangeEntity> findByRegionCodeAndStatus(String regionCode, ChangeStatus status)
+    type: derived
+  - method: findByChangeId
+    signature: Optional<NetworkChangeEntity> findByChangeId(String changeId)
+    type: derived
+  - method: findRiskQueue
+    query: select c from NetworkChangeEntity c where c.risk = :risk and c.status in :statuses
+    signature: List<NetworkChangeEntity> findRiskQueue(@Param("risk") ChangeRisk risk, @Param("statuses") Collection<ChangeStatus> statuses)
+    type: jpql
+  - method: findByRegionNative
+    nativeQuery: true
+    query: select * from network_change where region_code = :regionCode
+    signature: List<NetworkChangeEntity> findByRegionNative(@Param("regionCode") String regionCode)
+    type: native
+- entity: ChangeAuditEntity
+  extends: JpaRepository<ChangeAuditEntity, Long>
+  file: network-change-service/src/main/java/com/example/telecom/change/repository/ChangeAuditJpaRepository.java
+  fqn: com.example.telecom.change.repository.ChangeAuditJpaRepository
+  id_type: Long
+  name: ChangeAuditJpaRepository
+  queries:
+  - method: findByChangeId
+    signature: List<ChangeAuditEntity> findByChangeId(Long changeId)
+    type: derived
+  - method: findByAction
+    signature: List<ChangeAuditEntity> findByAction(String action)
+    type: derived
+service_to_repository_calls:
+- callee: ChangeAuditJpaRepository.save
+  caller: ChangeAuditService.record
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeAuditService.java
+- callee: ChangeAuditJpaRepository.findByAction
+  caller: ChangeAuditService.findByAction
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeAuditService.java
+task_type: framework_structure
+test_class:
+  file: network-change-service/src/test/java/com/example/telecom/change/repository/CaseLJpaMappingTest.java
+  methods:
+  - entity_isMappedToCorrectTable
+  - entity_derivedQuery_findByRegionCodeAndStatus
+  - entity_jpqlQuery_findRiskQueue
+  - entity_relationship_oneToMany_steps
+  - entity_embedded_maintenanceWindow
+  - entity_version_optimisticLocking
+  - entity_nativeQuery_works
+  name: CaseLJpaMappingTest
+truth_version: '2.1'
+source_commit: 5c2fdcdf9e3b7829fc8ace183e2b0876ccbb188a
+source_dirty: true
+source_scope_clean: true
+source_project: telecom-ops-platform
+source_module: network-change-service
+reviewed_at: '2026-07-20'
+analysis_scope: src/main/java only
+dimension_weights:
+  entity_mapping: 35
+  symbols: 20
+  facts: 25
+  edges: 10
+  noise: 10

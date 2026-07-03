@@ -1,0 +1,50 @@
+case_id: telecom-case-x-alarm-severity-sla-data-flow
+task_type: data_flow
+ground_truth_status: reviewed
+
+expected_entrypoints:
+  - symbol: AlarmEventConsumer.onAlarmCreated
+    file: workorder-service/src/main/java/com/example/telecom/workorder/consumer/AlarmEventConsumer.java
+    reason: Receives AlarmEvent and delegates automatic work-order creation.
+
+expected_symbols:
+  - symbol: AutoWorkOrderService.createForAlarm
+    file: workorder-service/src/main/java/com/example/telecom/workorder/service/AutoWorkOrderService.java
+    reason: Gates auto-creation to CRITICAL/MAJOR and constructs WorkOrder.
+  - symbol: AutoWorkOrderService.mapPriority
+    file: workorder-service/src/main/java/com/example/telecom/workorder/service/AutoWorkOrderService.java
+    reason: Maps Severity to WorkOrderPriority.
+  - symbol: WorkOrder
+    file: common-domain/src/main/java/com/example/telecom/common/workorder/WorkOrder.java
+    reason: Persists priority used by downstream SLA logic.
+  - symbol: WorkOrderSlaService.isSlaBreached
+    file: workorder-service/src/main/java/com/example/telecom/workorder/service/WorkOrderSlaService.java
+    reason: Selects SLA duration from WorkOrderPriority and compares elapsed time.
+  - symbol: SlaEscalationPolicy.shouldEscalate
+    file: workorder-service/src/main/java/com/example/telecom/workorder/workflow/SlaEscalationPolicy.java
+    reason: Uses the same priority-based SLA thresholds for escalation.
+  - symbol: WorkOrderEscalationService
+    file: workorder-service/src/main/java/com/example/telecom/workorder/service/WorkOrderEscalationService.java
+    reason: Applies escalation policy to production work orders.
+
+expected_data_flow:
+  - field: AlarmEvent.severity
+    route: "AlarmEvent -> createForAlarm gate -> mapPriority"
+  - field: WorkOrder.priority
+    route: "CRITICAL->CRITICAL; MAJOR->HIGH -> WorkOrder -> SLA threshold selection/escalation"
+
+must_mention:
+  - WARNING and INFO return null before WorkOrder construction, despite mapPriority defining mappings for all enum values.
+  - createForAlarm saves the CREATED work order and immediately calls WorkOrderFlowService.assign.
+  - Priority is independent of WorkOrderEvent.toStatus and NotificationService channel selection.
+  - SLA tests must cover at least CRITICAL versus lower priority elapsed-time boundaries.
+
+must_exclude_from_impact:
+  - symbol: AlarmSeverityClassifier
+    reason: Produces an earlier AlarmRecord severity but is upstream of the given AlarmEvent boundary.
+  - symbol: SlaEvaluator
+    reason: Alarm-engine risk evaluation is not work-order SLA timing.
+
+recommended_validation:
+  - mvn -pl workorder-service -am test -Dtest=AlarmEventConsumerTest,AutoWorkOrderServiceTest,WorkOrderSlaServiceTest,WorkOrderEscalationServiceTest
+  - Assert no work order for WARNING/INFO and exact CRITICAL/MAJOR priority mappings.

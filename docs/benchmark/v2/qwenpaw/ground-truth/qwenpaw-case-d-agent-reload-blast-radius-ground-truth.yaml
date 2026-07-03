@@ -1,0 +1,103 @@
+case_id: qwenpaw-case-d-agent-reload-blast-radius
+task_type: impact_analysis
+
+target:
+  symbol: schedule_agent_reload
+  file: src/qwenpaw/app/utils.py
+  current_signature: "schedule_agent_reload(request, agent_id)"
+  proposed_signature: "schedule_agent_reload(request, agent_id, reload_reason)"
+  graph_risk: CRITICAL
+  graph_blast_radius:
+    direct_callers: 26
+    total_impacted_with_depth_3: 32
+    affected_process_groups: 18
+
+expected_symbols:
+  - symbol: schedule_agent_reload
+    file: src/qwenpaw/app/utils.py
+    reason: Shared non-blocking reload scheduler used after configuration mutations.
+  - symbol: reload_in_background
+    file: src/qwenpaw/app/utils.py
+    reason: Captures manager and agent_id, awaits MultiAgentManager.reload_agent, and contains failures.
+  - symbol: MultiAgentManager.reload_agent
+    file: src/qwenpaw/app/multi_agent_manager.py
+    reason: Terminal operation reached by every successful scheduled reload.
+
+direct_callers_by_file:
+  - file: src/qwenpaw/app/routers/agents.py
+    callers:
+      - symbol: update_agent
+  - file: src/qwenpaw/app/routers/config.py
+    callers:
+      - symbol: put_channels
+      - symbol: put_channel
+      - symbol: put_acp_config
+      - symbol: put_acp_agent_config
+  - file: src/qwenpaw/app/routers/mcp.py
+    callers:
+      - symbol: create_mcp_client
+      - symbol: update_mcp_client
+      - symbol: toggle_mcp_client
+      - symbol: delete_mcp_client
+  - file: src/qwenpaw/app/routers/mcp_oauth.py
+    callers:
+      - symbol: _persist_tokens
+      - symbol: oauth_revoke
+  - file: src/qwenpaw/app/routers/plugins.py
+    callers:
+      - symbol: _schedule_all_agents_reload
+  - file: src/qwenpaw/app/routers/providers.py
+    callers:
+      - symbol: set_active_model
+  - file: src/qwenpaw/app/routers/skills.py
+    callers:
+      - symbol: create_skill
+      - symbol: upload_skill_zip
+      - symbol: batch_disable_skills
+      - symbol: batch_enable_skills
+      - symbol: disable_skill
+      - symbol: enable_skill
+      - symbol: save_workspace_skill
+      - symbol: update_skill_channels_endpoint
+  - file: src/qwenpaw/app/routers/tools.py
+    callers:
+      - symbol: toggle_tool
+      - symbol: update_tool_async_execution
+      - symbol: update_tool_config
+  - file: src/qwenpaw/app/routers/workspace.py
+    callers:
+      - symbol: put_agents_running_config
+      - symbol: put_system_prompt_files
+
+indirect_entrypoints:
+  - symbol: oauth_callback
+    chain: "oauth_callback -> _persist_tokens -> schedule_agent_reload"
+    file: src/qwenpaw/app/routers/mcp_oauth.py
+  - symbol: _post_load_setup
+    chain: "install_plugin/upload_plugin -> _post_load_setup -> _schedule_all_agents_reload -> schedule_agent_reload"
+    file: src/qwenpaw/app/routers/plugins.py
+  - symbol: uninstall_plugin
+    chain: "uninstall_plugin -> _schedule_all_agents_reload -> schedule_agent_reload"
+    file: src/qwenpaw/app/routers/plugins.py
+
+must_mention:
+  - The function extracts request.app.state.multi_agent_manager before creating the task.
+  - Missing MultiAgentManager logs a warning and returns without scheduling.
+  - asyncio.create_task makes API responses non-blocking.
+  - Background exceptions are logged and not propagated to the original HTTP request.
+  - A required reload_reason must be supplied by all 26 direct callers, including wrapper functions.
+  - Plugin-wide reload iterates agent IDs, so the reason must remain stable across fan-out.
+
+must_exclude_from_impact:
+  - symbol: MCPClient.reload
+    reason: MCP server reconnection, unrelated to agent reload scheduling.
+  - symbol: BaseChannel.send
+    reason: Channel message sending, a different operation entirely.
+  - symbol: crons.manager.reschedule_heartbeat
+    reason: Cron job rescheduling, unrelated to agent configuration reload.
+  - symbol: MultiAgentManager.preload_agent
+    reason: Pre-loading is a different lifecycle operation from reload.
+
+recommended_validation:
+  - python -m pytest tests/unit/app
+  - targeted tests for missing manager, background failure, OAuth token persistence, plugin fan-out, and one route from each caller group

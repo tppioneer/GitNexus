@@ -1,0 +1,17 @@
+id: telecom-large-case-y-dispatch-priority-filter-bug
+name: Telecom Large dispatch priority filter ignored bug
+level: L2
+task_type: bug_localization
+repo: telecom-ops-platform-large
+status: reviewed
+
+prompt: |
+  回归现象：请求 `/api/dispatch/orders?priority=HIGH` 时，返回结果仍包含 MEDIUM 和 LOW 的派单；status 和 regionCode 过滤却正常工作。
+  请定位 priority 参数从 HTTP 到查询结果之间在哪里丢失，并给出能区分三个过滤条件的最小回归测试。
+  不要修改代码，只输出根因、证据、影响和验证建议。
+
+extra_desc: |
+  人工审阅提示，不进入公开载荷：Controller 正确接收并转发 priority；OrchestrationService.listOrders 只实现 status/regionCode 过滤。
+
+ground_truth: docs/benchmark/v2/telecom/large/ground-truth/telecom-large-case-y-ground-truth.yaml
+

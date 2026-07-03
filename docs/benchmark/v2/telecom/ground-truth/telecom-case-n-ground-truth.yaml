@@ -1,0 +1,191 @@
+all_dispatch_overloads:
+- class: ChangeCommandBus
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeCommandBus.java
+  id: n.all_dispatch_overloads.changecommandbus
+  method: dispatch
+  overloads:
+  - parameter_count: 1
+    parameter_types:
+    - ChangeCommand
+    signature: DispatchResult dispatch(ChangeCommand command)
+  - parameter_count: 1
+    parameter_types:
+    - EmergencyChangeCommand
+    signature: DispatchResult dispatch(EmergencyChangeCommand command)
+  - parameter_count: 2
+    parameter_types:
+    - String
+    - ChangeMode
+    signature: DispatchResult dispatch(String changeId, ChangeMode mode)
+callback_sites:
+- caller: test code / caller
+  expression: callbackRegistry.register(ChangeStatus.COMPLETED, planId -> { ... })
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeCallbackRegistry.java
+  functional_interface: Consumer<String>
+  id: callback-register-lambda
+  registration_type: lambda
+  registry: ChangeCallbackRegistry
+- caller: test code / caller
+  expression: callbackRegistry.register(ChangeStatus.COMPLETED, auditService::onCompleted)
+  functional_interface: Consumer<String>
+  id: callback-register-method-reference
+  registration_type: method_reference
+  registry: ChangeCallbackRegistry
+  target: ChangeAuditService.onCompleted(String)
+- caller: ChangeCallbackRegistry.fire
+  expression: handlers.forEach(h -> h.accept(planId))
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeCallbackRegistry.java
+  id: callback-fire
+  invocation_type: Consumer<String>.accept(String) — lambda callback invocation
+case_id: telecom-case-n-overload-callback
+constructor_overloads:
+  class: ChangeContext
+  constructors:
+  - delegates_to: 6-param constructor with defaults (LIVE, "default", "system", now)
+    parameter_count: 2
+    parameter_types:
+    - String
+    - DeviceFamily
+    signature: ChangeContext(String changeId, DeviceFamily family)
+  - delegates_to: 6-param constructor with defaults
+    parameter_count: 3
+    parameter_types:
+    - String
+    - DeviceFamily
+    - ChangeMode
+    signature: ChangeContext(String changeId, DeviceFamily family, ChangeMode mode)
+  - parameter_count: 6
+    parameter_types:
+    - String
+    - DeviceFamily
+    - ChangeMode
+    - String
+    - String
+    - Instant
+    signature: ChangeContext(String changeId, DeviceFamily family, ChangeMode mode, String regionCode, String operatorId, Instant requestedAt)
+  file: network-change-service/src/main/java/com/example/telecom/change/domain/ChangeContext.java
+expected_entrypoints:
+- file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeCommandBus.java
+  id: ep.change-command-bus
+  symbol: ChangeCommandBus
+- file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeCallbackRegistry.java
+  id: ep.change-callback-registry
+  symbol: ChangeCallbackRegistry
+expected_facts:
+- description: dispatch(ChangeCommand) resolves to base overload returning dispatchedTo=ChangeCommand
+  id: fact.dispatch-base-command
+- description: dispatch(EmergencyChangeCommand) resolves to emergency overload returning dispatchedTo=EmergencyChangeCommand
+  id: fact.dispatch-emergency
+- description: dispatch(String, ChangeMode) resolves to third overload returning dispatchedTo=ChangeId+Mode
+  id: fact.dispatch-id-mode
+- description: All three dispatch overloads produce distinct dispatchedTo values
+  id: fact.overloads-distinct
+- description: ChangeContext(String, DeviceFamily) delegates to 6-param constructor with LIVE mode and defaults
+  id: fact.constructor-two-param
+- description: stepExecutor::executeStep is a method reference binding to ChangeStepExecutor.executeStep(String)
+  id: fact.method-ref-execute-step
+- description: plan::markRunning is a method reference binding to NetworkChangePlan.markRunning()
+  id: fact.method-ref-mark-running
+- description: ChangeCallbackRegistry.register accepts Consumer<String> callbacks for ChangeStatus keys
+  id: fact.callback-consumer
+- description: ChangeAuditService.onCompleted can be registered as a method reference callback via auditService::onCompleted
+  id: fact.audit-on-completed-callback
+expected_symbols:
+- file: network-change-service/src/main/java/com/example/telecom/change/domain/ChangeContext.java
+  id: sym.change-context
+  symbol: ChangeContext
+- file: network-change-service/src/main/java/com/example/telecom/change/domain/ChangeCommand.java
+  id: sym.change-command
+  symbol: ChangeCommand
+- file: network-change-service/src/main/java/com/example/telecom/change/domain/EmergencyChangeCommand.java
+  id: sym.emergency-change-command
+  symbol: EmergencyChangeCommand
+- file: network-change-service/src/main/java/com/example/telecom/change/executor/ChangeStepExecutor.java
+  id: sym.change-step-executor
+  symbol: ChangeStepExecutor
+- file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeAuditService.java
+  id: sym.change-audit-service
+  symbol: ChangeAuditService
+ground_truth_status: draft
+lambda_sites:
+- caller: ChangeExecutionService.validateAll
+  expression: executors.forEach(executor -> { ... executor.execute(ctx) ... })
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeExecutionService.java
+  id: forEach-validate
+  lambda_body_calls:
+  - edge_kind: JAVA_INTERFACE_DISPATCH
+    possible_targets:
+    - RouterChangeExecutor.execute(ChangeContext)
+    - TransmissionChangeExecutor.execute(ChangeContext)
+    - RadioChangeExecutor.execute(ChangeContext)
+    target: ChangeExecutor.execute(ChangeContext)
+method_reference_sites:
+- caller: ChangeExecutionService.executeSteps
+  edge_kind: JAVA_METHOD_REFERENCE
+  expression: stepNames.stream().map(stepExecutor::executeStep).toList()
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeExecutionService.java
+  id: stepExecutor-executeStep
+  runtime_target: ChangeStepExecutor.executeStep(String)
+  static_target: ChangeStepExecutor.executeStep(String)
+- caller: ChangeExecutionService.submitAsyncMark
+  edge_kind: JAVA_METHOD_REFERENCE
+  expression: executorService.submit(plan::markRunning)
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeExecutionService.java
+  id: plan-markRunning
+  runtime_target: NetworkChangePlan.markRunning()
+  static_target: NetworkChangePlan.markRunning()
+noise_items:
+- id: noise.n-changeexecutionservice-0
+  reason: Same method name 'execute' but different signature — NOT a ChangeExecutor override
+  symbol: ChangeExecutionService.execute(String planId)
+- id: noise.n-plugindescriptor-1
+  reason: Configuration string — NOT a method call
+  symbol: PluginDescriptor.executeMethodName = "execute"
+- id: noise.n-legacynetworkchangecontroller-2
+  reason: Unmapped method with same name as R07 handler — not a dispatch target
+  symbol: LegacyNetworkChangeController.search(String, String)
+overload_sites:
+- caller_context: ChangeCommand cmd = new ChangeCommand(...); commandBus.dispatch((ChangeCommand) cmd)
+  dispatched_to: ChangeCommand
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeCommandBus.java
+  id: dispatch-base-command
+  runtime_target: ChangeCommandBus.dispatch(ChangeCommand)
+  signature_match: exact — ChangeCommand parameter type
+  static_target: ChangeCommandBus.dispatch(ChangeCommand)
+- caller_context: EmergencyChangeCommand cmd = new EmergencyChangeCommand(...); commandBus.dispatch(cmd)
+  dispatched_to: EmergencyChangeCommand
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeCommandBus.java
+  id: dispatch-emergency-command
+  runtime_target: ChangeCommandBus.dispatch(EmergencyChangeCommand)
+  signature_match: exact — EmergencyChangeCommand is more specific than ChangeCommand
+  static_target: ChangeCommandBus.dispatch(EmergencyChangeCommand)
+- caller_context: commandBus.dispatch(changeId, ChangeMode.DRY_RUN)
+  dispatched_to: ChangeId+Mode
+  file: network-change-service/src/main/java/com/example/telecom/change/service/ChangeCommandBus.java
+  id: dispatch-id-and-mode
+  runtime_target: ChangeCommandBus.dispatch(String, ChangeMode)
+  signature_match: exact — two parameters (String, ChangeMode)
+  static_target: ChangeCommandBus.dispatch(String, ChangeMode)
+recommended_validation:
+- mvn -pl network-change-service -am test -Dtest=CaseNOverloadCallbackTest,ChangeCommandBusOverloadTest,ChangeContextConstructorOverloadTest
+task_type: call_graph
+test_classes:
+- file: network-change-service/src/test/java/com/example/telecom/change/service/CaseNOverloadCallbackTest.java
+  name: CaseNOverloadCallbackTest
+- file: network-change-service/src/test/java/com/example/telecom/change/service/ChangeCommandBusOverloadTest.java
+  name: ChangeCommandBusOverloadTest
+- file: network-change-service/src/test/java/com/example/telecom/change/domain/ChangeContextConstructorOverloadTest.java
+  name: ChangeContextConstructorOverloadTest
+truth_version: '2.1'
+source_commit: 5c2fdcdf9e3b7829fc8ace183e2b0876ccbb188a
+source_dirty: true
+source_scope_clean: true
+source_project: telecom-ops-platform
+source_module: network-change-service
+reviewed_at: '2026-07-20'
+analysis_scope: src/main/java only
+dimension_weights:
+  overload_accuracy: 35
+  symbols: 25
+  facts: 30
+  noise: 10

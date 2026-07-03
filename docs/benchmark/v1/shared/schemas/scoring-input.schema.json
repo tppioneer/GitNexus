@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gitnexus.dev/schemas/ai-coding-benchmark/scoring-input.schema.json",
+  "title": "AI Coding Benchmark Scoring Input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["case_id", "run_result", "golden_answer", "score"],
+  "properties": {
+    "case_id": { "type": "string" },
+    "run_result": { "type": "string", "description": "Path to a run-result JSON file." },
+    "golden_answer": { "type": "string", "description": "Path to a hidden golden-answer JSON file." },
+    "score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "location_accuracy",
+        "coverage_completeness",
+        "evidence_quality",
+        "noise_resistance",
+        "final_usability",
+        "total"
+      ],
+      "properties": {
+        "location_accuracy": { "type": "number", "minimum": 0, "maximum": 10 },
+        "coverage_completeness": { "type": "number", "minimum": 0, "maximum": 10 },
+        "evidence_quality": { "type": "number", "minimum": 0, "maximum": 10 },
+        "noise_resistance": { "type": "number", "minimum": 0, "maximum": 10 },
+        "final_usability": { "type": "number", "minimum": 0, "maximum": 10 },
+        "pre_change_impact_analysis": { "type": "number", "minimum": 0, "maximum": 10 },
+        "implementation_correctness": { "type": "number", "minimum": 0, "maximum": 10 },
+        "test_coverage": { "type": "number", "minimum": 0, "maximum": 10 },
+        "diff_cleanliness": { "type": "number", "minimum": 0, "maximum": 10 },
+        "post_change_verification": { "type": "number", "minimum": 0, "maximum": 10 },
+        "policy_violation_penalty": { "type": "number", "minimum": 0 },
+        "total": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "judge_notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

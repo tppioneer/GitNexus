@@ -1,0 +1,56 @@
+case: telecom-large-case-e-notification-channel-impact
+level: L2 - impact_analysis
+title: "【50K 规模】NotificationChannel.send 签名变更影响分析"
+
+description: >
+  50,000 行规模。NotificationChannel.send 签名变更。
+  新增 dispatch-service 也有 send 相关方法，vendor-collaboration-service
+  也有通知逻辑。需要精确区分目标接口。
+
+task: >
+  如果给 NotificationChannel.send(NotificationRequest request) 增加 DeliveryContext context 参数，
+  需要同步检查哪些实现类、调用方、重试逻辑、模板变量解析和测试？
+
+target_interface:
+  name: NotificationChannel
+  method: send
+
+target_implementations:
+  - SmsNotificationChannel
+  - EmailNotificationChannel
+  - WeComNotificationChannel
+
+target_callers:
+  - NotificationService
+  - NotificationRetryService
+  - NotificationBatchService
+
+noise_send_methods:
+  - "DeviceClient.send (ops-gateway, different interface)"
+  - "AlarmClient.send (ops-gateway, different interface)"
+  - "WorkOrderClient.send (ops-gateway, different interface)"
+  - "NotificationRetryService.process (same module, different method)"
+
+graph_queries:
+  - 'impact({target: "send", direction: "upstream"})'
+  - 'context({name: "NotificationChannel"})'
+  - 'query({search_query: "notification channel send"})'
+
+grep_searches:
+  - rg "interface NotificationChannel|class .*NotificationChannel|send\\("
+  - rg "NotificationService|NotificationRetryService"
+  - rg "SendResult|NotificationRequest"
+
+ground_truth: docs/benchmark/v1/telecom/large/ground-truth/telecom-large-case-e-ground-truth.yaml
+
+risk_level: MEDIUM
+
+scoring:
+  must_identify:
+    - 3 个 NotificationChannel 实现类
+    - NotificationService、NotificationRetryService、NotificationBatchService
+    - NotificationTemplateService（间接调用）
+    - 对应测试类
+  penalty_items:
+    - 把 Client.send 方法纳入影响面
+    - 把 NotificationRuleService 纳入影响面

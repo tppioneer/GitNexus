@@ -1,0 +1,41 @@
+id: telecom-case-i-java-annotation-binding
+name: Telecom custom Java annotation binding and meta-annotation analysis
+level: L2
+task_type: symbol_navigation
+repo: telecom-ops-platform
+status: draft-ground-truth
+
+prompt: |
+  请分析 network-change-service 中 8 个自定义注解的类型定义、注解应用和注解元素绑定。
+  以 ChangePlanService 为核心入口，说明：
+  - 每个注解类型的 Target、Retention 和元素方法；
+  - ChangePlanService.approve 上的 @CriticalChange 如何带来 meta-annotation @AuditOperation 和 @ChangeGuard；
+  - ChangePlanService 类级 @RequiredCapability 的 repeatable 应用和容器注解；
+  - ChangePlanQueryService.findByRegion 参数上的 @RegionScope；
+  - ChangePlanService.updateRisk 上使用全限定注解名 @com.example.telecom.change.annotation.AuditOperation 的绑定；
+  - @ChangeExecutorCandidate 作为 @Qualifier meta-annotation 的作用；
+  - @OpsReadEndpoint 作为组合注解标记的使用模式。
+  区分 Java 符号绑定、注解组合关系和 Spring 框架语义，不要把"识别到注解文本"等同于"理解框架语义"。
+
+graph_queries:
+  - 'context({name: "AuditOperation"})'
+  - 'context({name: "CriticalChange"})'
+  - 'context({name: "ChangePlanService"})'
+
+grep_searches:
+  - rg "@interface AuditOperation|@interface ChangeGuard|@interface CriticalChange|@interface RequiredCapability"
+  - rg "@AuditOperation|@ChangeGuard|@CriticalChange|@RequiredCapability"
+
+ground_truth: docs/benchmark/v2/telecom/ground-truth/telecom-case-i-ground-truth.yaml
+
+risk_level: LOW
+
+scoring:
+  must_identify:
+    - 8 个注解类型定义
+    - 注解元素与值的绑定
+    - meta-annotation 链
+    - repeatable 与容器
+  must_exclude:
+    - 字符串中出现的注解文本
+    - FakeTransactionalMarker

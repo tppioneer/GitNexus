@@ -1,0 +1,136 @@
+version: 1
+name: telecom-ops-platform-large-agent-benchmark
+
+description: >
+  50,000 行规模电信运维平台测评。12 个 Maven 模块，11 个 benchmark case (A~I + K, N)。
+  与 telecom-ops-platform (12K 行) 是同一业务领域的规模升级版，
+  噪音密度约为原版的 3~5 倍，用于验证 AI Coding 工具在更大代码库中的检索能力。
+  新增的 K（联邦告警流）和 N（厂商协同流）是 50K 新增模块带来的全新执行流。
+
+target_project:
+  name: telecom-ops-platform-large
+  path: C:/qinliuwei/code/Gitnexus-benchmark/telecom-ops-platform-large
+  language: java
+  build_tool: maven
+  prerequisites:
+    java_home: C:/Program Files/Eclipse Adoptium/jdk-17.0.19.10-hotspot
+    maven_home: C:/tools/apache-maven-3.9.16
+  validation_commands:
+    - mvn test
+
+project_overview:
+  name: telecom-ops-platform
+  language: Java
+  framework: Spring Boot 3.x, Maven, H2
+  lines_of_code: 49503
+  modules: 12
+  description: 电信运维平台（50K 规模版），涵盖设备采集、告警引擎、工单流转、通知、看板、联邦告警、厂商协同等模块
+
+case_source:
+  directory: cases
+  golden_directory: ground-truth
+  hide_expected_fields_from_agent: true
+  cases:
+    # === 原始 Case A~I（保留核心答案，干扰项扩展） ===
+    - id: telecom-large-case-a-metric-to-workorder-flow
+      file: cases/telecom-large-case-a-metric-to-workorder-flow.yaml
+      golden: ground-truth/telecom-large-case-a-ground-truth.yaml
+      task_type: flow_tracing
+      modification_case: false
+    - id: telecom-large-case-b-rule-evaluator-impact
+      file: cases/telecom-large-case-b-rule-evaluator-impact.yaml
+      golden: ground-truth/telecom-large-case-b-ground-truth.yaml
+      task_type: impact_analysis
+      modification_case: false
+    - id: telecom-large-case-c-region-code-rename
+      file: cases/telecom-large-case-c-region-code-rename.yaml
+      golden: ground-truth/telecom-large-case-c-ground-truth.yaml
+      task_type: small_code_change
+      modification_case: true
+    - id: telecom-large-case-d-workorder-state
+      file: cases/telecom-large-case-d-workorder-state.yaml
+      golden: ground-truth/telecom-large-case-d-ground-truth.yaml
+      task_type: small_code_change
+      modification_case: true
+    - id: telecom-large-case-e-notification-channel-impact
+      file: cases/telecom-large-case-e-notification-channel-impact.yaml
+      golden: ground-truth/telecom-large-case-e-ground-truth.yaml
+      task_type: impact_analysis
+      modification_case: false
+    - id: telecom-large-case-f-dashboard-drilldown-flow
+      file: cases/telecom-large-case-f-dashboard-drilldown-flow.yaml
+      golden: ground-truth/telecom-large-case-f-ground-truth.yaml
+      task_type: flow_tracing
+      modification_case: false
+    - id: telecom-large-case-g-vendor-adapter-impact
+      file: cases/telecom-large-case-g-vendor-adapter-impact.yaml
+      golden: ground-truth/telecom-large-case-g-ground-truth.yaml
+      task_type: impact_analysis
+      modification_case: false
+    - id: telecom-large-case-h-severity-enum-change
+      file: cases/telecom-large-case-h-severity-enum-change.yaml
+      golden: ground-truth/telecom-large-case-h-ground-truth.yaml
+      task_type: small_code_change
+      modification_case: true
+    - id: telecom-large-case-i-maintenance-window-suppression
+      file: cases/telecom-large-case-i-maintenance-window-suppression.yaml
+      golden: ground-truth/telecom-large-case-i-ground-truth.yaml
+      task_type: impact_analysis
+      modification_case: false
+
+    # === 新增 Case K, N（50K 项目特有：新模块的全新执行流） ===
+    - id: telecom-large-case-k-federated-alarm-flow
+      file: cases/telecom-large-case-k-federated-alarm-flow.yaml
+      golden: ground-truth/telecom-large-case-k-ground-truth.yaml
+      task_type: flow_tracing
+      modification_case: false
+    - id: telecom-large-case-n-vendor-collaboration-flow
+      file: cases/telecom-large-case-n-vendor-collaboration-flow.yaml
+      golden: ground-truth/telecom-large-case-n-ground-truth.yaml
+      task_type: flow_tracing
+      modification_case: false
+
+run_matrix:
+  agents:
+    - claude-code
+  tool_policies:
+    - grep
+    - graph
+  repeats_per_cell: 3
+  total_required_runs: 66  # 11 cases × 1 agent × 2 policies × 3 repeats
+
+isolation:
+  analysis_cases:
+    fresh_agent_context: true
+    clean_worktree_required: false
+    allow_no_edit: true
+  modification_cases:
+    fresh_agent_context: true
+    clean_worktree_required: true
+    isolated_worktree_per_run: true
+    reset_or_discard_after_run: true
+  forbidden_context:
+    - golden answers
+    - previous run outputs
+    - scoring notes
+    - benchmark design discussion documents
+
+expected_report_sections:
+  - per_case_agent_policy_scores
+  - claude_code_graph_vs_grep
+  - opencode_graph_vs_grep
+  - graph_uplift_across_agents
+  - claude_code_vs_opencode_under_grep
+  - claude_code_vs_opencode_under_graph
+  - noise_density_correlation  # NEW: scores vs noise density per case
+  - invalid_or_policy_violating_runs
+  - qualitative_failure_patterns
+
+success_criteria:
+  - All required run cells produce a valid run-result JSON or an explicit invalid-run record.
+  - Case A reports flow coverage and side-effect coverage separately.
+  - Case B reports true RuleEvaluator implementations separately from evaluate() noise.
+  - Case C reports pre-change impact, implementation correctness, tests, diff cleanliness, and post-change verification separately.
+  - Cases K and N have their own distinct scoring criteria defined in their case YAML.
+  - Final report includes noise_density_correlation section analyzing whether higher noise density widens the graph-vs-grep gap.
+  - Final report does not attribute agent differences to GitNexus without the within-agent graph-vs-grep comparison.

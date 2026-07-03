@@ -1,0 +1,73 @@
+case: telecom-case-b
+ground_truth_type: impact_analysis
+truth_version: "1.0"
+
+target:
+  interface: RuleEvaluator
+  file: alarm-engine-service/src/main/java/com/example/telecom/alarm/rule/RuleEvaluator.java
+  change: "add EvaluationContext as third parameter to evaluate()"
+
+must_include_in_impact:
+  implementations:
+    - symbol: CpuUsageRuleEvaluator
+      file: alarm-engine-service/.../rule/CpuUsageRuleEvaluator.java
+      note: "Has overloaded evaluate(DeviceInfo) — must distinguish signatures"
+    - symbol: MemoryUsageRuleEvaluator
+      file: alarm-engine-service/.../rule/MemoryUsageRuleEvaluator.java
+    - symbol: OpticalPowerRuleEvaluator
+      file: alarm-engine-service/.../rule/OpticalPowerRuleEvaluator.java
+    - symbol: PacketLossRuleEvaluator
+      file: alarm-engine-service/.../rule/PacketLossRuleEvaluator.java
+    - symbol: TemperatureRuleEvaluator
+      file: alarm-engine-service/.../rule/TemperatureRuleEvaluator.java
+
+  callers:
+    - symbol: AlarmEvaluationService
+      file: alarm-engine-service/.../service/AlarmEvaluationService.java
+      note: "Core caller — must construct and pass EvaluationContext"
+    - symbol: RuleEvaluatorRegistry
+      file: alarm-engine-service/.../rule/RuleEvaluatorRegistry.java
+      note: "Returns RuleEvaluator — type reference check needed"
+    - symbol: DeviceMetricEventConsumer
+      file: alarm-engine-service/.../consumer/DeviceMetricEventConsumer.java
+      note: "Indirect caller via AlarmEvaluationService"
+
+  tests:
+    - symbol: AlarmEvaluationServiceTest
+      file: alarm-engine-service/src/test/java/.../AlarmEvaluationServiceTest.java
+    - symbol: RuleEvaluatorRegistryTest
+      file: alarm-engine-service/src/test/java/.../RuleEvaluatorRegistryTest.java
+    - symbol: CpuUsageRuleEvaluatorTest
+      file: alarm-engine-service/src/test/java/.../CpuUsageRuleEvaluatorTest.java
+    - symbol: OpticalPowerRuleEvaluatorTest
+      file: alarm-engine-service/src/test/java/.../OpticalPowerRuleEvaluatorTest.java
+    - symbol: PacketLossRuleEvaluatorTest
+      file: alarm-engine-service/src/test/java/.../PacketLossRuleEvaluatorTest.java
+
+must_exclude_from_impact:
+  - symbol: SlaEvaluator.evaluate
+    reason: "NOT a RuleEvaluator implementation — independent class with unrelated evaluate()"
+    file: alarm-engine-service/.../service/SlaEvaluator.java
+  - symbol: RiskEvaluator.evaluate
+    reason: "NOT a RuleEvaluator implementation — independent class with unrelated evaluate()"
+    file: alarm-engine-service/.../service/RiskEvaluator.java
+  - symbol: AlarmEscalationEvaluator.evaluate
+    reason: "NOT a RuleEvaluator implementation — unrelated evaluate() method"
+    file: alarm-engine-service/.../service/AlarmEscalationEvaluator.java
+  - symbol: EscalationPolicy.evaluate
+    reason: "Different interface in workorder-service — unrelated to RuleEvaluator"
+    file: workorder-service/.../workflow/EscalationPolicy.java
+  - symbol: DashboardHealthEvaluator.evaluate
+    reason: "Independent class in ops-gateway-service — unrelated evaluate()"
+    file: ops-gateway-service/.../service/DashboardHealthEvaluator.java
+
+risk_justification: >
+  HIGH risk because the interface method signature change affects 5 implementation
+  classes, 2 caller classes, and 3+ test classes. The high density of evaluate()
+  noise methods (at least 5 unrelated) makes grep-only approaches unreliable.
+  The overloaded evaluate(DeviceInfo) in CpuUsageRuleEvaluator adds signature
+  disambiguation complexity.
+
+verification:
+  - mvn -pl alarm-engine-service test
+  - mvn test

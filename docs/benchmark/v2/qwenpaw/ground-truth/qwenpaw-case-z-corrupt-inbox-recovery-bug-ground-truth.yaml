@@ -1,0 +1,57 @@
+case_id: qwenpaw-case-z-corrupt-inbox-recovery-bug
+task_type: bug_localization
+ground_truth_status: reviewed
+
+expected_entrypoints:
+  - symbol: get_inbox_events
+    file: src/qwenpaw/app/routers/console.py
+    reason: The HTTP read path delegates directly to inbox_store.list_events.
+  - symbol: CronManager._execute_once
+    file: src/qwenpaw/app/crons/manager.py
+    reason: Completed cron jobs append result or fallback events to the inbox.
+  - symbol: run_heartbeat_once
+    file: src/qwenpaw/app/crons/heartbeat.py
+    reason: Heartbeat success, timeout and error branches append inbox events.
+
+expected_symbols:
+  - symbol: list_events
+    file: src/qwenpaw/app/inbox_store.py
+    reason: Loads the whole JSON document before filtering and pagination.
+  - symbol: append_event
+    file: src/qwenpaw/app/inbox_store.py
+    reason: Reads all existing events before inserting and saving a new one, so writes also depend on a successful read.
+  - symbol: _load_events
+    file: src/qwenpaw/app/inbox_store.py
+    reason: Calls read_text and json.loads without handling malformed JSON or read errors.
+  - symbol: _save_events
+    file: src/qwenpaw/app/inbox_store.py
+    reason: Uses temporary-file replacement for normal writes, which reduces corruption risk but does not recover an already invalid source file.
+
+expected_root_causes:
+  - symbol: _load_events
+    file: src/qwenpaw/app/inbox_store.py
+    reason: "json.JSONDecodeError and OSError escape from the shared loader instead of producing a recoverable state or an explicit store error."
+  - symbol: append_event
+    file: src/qwenpaw/app/inbox_store.py
+    reason: "The append path is read-modify-write, so one malformed existing document prevents all future events from repairing or replacing it."
+
+expected_failure_chain:
+  - route: "GET /console/inbox/events -> get_inbox_events -> list_events -> _load_events -> json.loads raises -> HTTP 500"
+  - route: "cron/heartbeat completion -> append_inbox_event alias -> append_event -> _load_events raises -> no new inbox event saved"
+
+must_mention:
+  - The module-level asyncio.Lock serializes coroutines in one process but does not catch parse/read failures or coordinate multiple processes.
+  - _save_events already writes a temporary file then replaces the target; the root cause for this scenario is missing read-side recovery, not a non-atomic normal write.
+  - Returning an empty list silently would restore availability but could hide and overwrite recoverable valid prefixes; quarantine/backup plus explicit diagnostics is safer.
+  - Read, append, mark-read and delete paths all call _load_events, so the blast radius is wider than the list endpoint.
+
+must_exclude_from_impact:
+  - symbol: inbox_trace_store
+    reason: Trace persistence is a separate store and does not parse inbox_events.json.
+  - symbol: console_push_store
+    reason: Console push delivery uses different storage and cannot repair the inbox document.
+
+recommended_validation:
+  - Add tests/unit/app/test_inbox_store.py with _INBOX_PATH redirected to tmp_path and malformed, empty, valid and non-list JSON fixtures.
+  - Assert list_events and append_event have a defined recovery result, preserve a diagnostic copy of the malformed file, and allow the new event to be read afterward.
+  - Add router and heartbeat/cron tests to verify the store failure is translated or recovered deliberately rather than surfacing as an unrelated 500.

@@ -1,0 +1,63 @@
+case: telecom-large-case-d-workorder-state
+level: L3 - small_code_change
+title: "【50K 规模】WorkOrder 状态新增 WAITING_VENDOR 状态流转"
+
+description: >
+  50,000 行规模。为工单流转增加 WAITING_VENDOR 状态。
+  注意：device-lifecycle-service 也有 DeviceStateMachine（含 transition 方法），
+  不要混淆两个状态机。
+
+task: >
+  请为工单流转增加 WAITING_VENDOR 状态，允许 PROCESSING -> WAITING_VENDOR，
+  WAITING_VENDOR -> PROCESSING / RESOLVED / ESCALATED。
+  同步更新状态机、Controller、DTO、VendorTicket、SLA、测试和 ground truth。
+
+target:
+  state_machine: WorkOrderStateMachine
+  new_state: WAITING_VENDOR
+  new_transitions:
+    - PROCESSING -> WAITING_VENDOR
+    - WAITING_VENDOR -> PROCESSING
+    - WAITING_VENDOR -> RESOLVED
+    - WAITING_VENDOR -> ESCALATED
+
+related_services:
+  - WaitingVendorPolicy
+  - VendorTicketService
+  - WorkOrderSlaBreachService
+  - WorkOrderBulkActionService
+
+interference:
+  - "DeviceStateMachine.transition (device-lifecycle-service, NOT WorkOrderStateMachine)"
+  - "VendorCollaborationStateMachine.transition (vendor-collaboration-service, NOT WorkOrderStateMachine)"
+
+
+graph_queries:
+  - 'context({name: "WorkOrderStateMachine"})'
+  - 'context({name: "VendorTicketService"})'
+  - 'impact({target: "WorkOrderStateMachine.transition", direction: "upstream"})'
+  - 'query({search_query: "work order state machine WAITING_VENDOR transition"})'
+
+grep_searches:
+  - rg "WorkOrderStateMachine|transition\("
+  - rg "WAITING_VENDOR|VendorTicket"
+  - rg "DeviceStateMachine"
+  - rg "VendorCollaborationStateMachine"
+
+scoring:
+  must_identify_side_effects:
+    - WorkOrderStateMachine 新增 WAITING_VENDOR 状态
+    - 新增 PROCESSING -> WAITING_VENDOR 等四条流转
+    - Controller 增加 WAITING_VENDOR case 处理
+    - 同步更新测试 WorkOrderStateMachineTest
+    - 更新 fixture 和 DTO
+  penalty_items:
+    - 修改 DeviceStateMachine（不同模块的状态机）
+    - 修改 VendorCollaborationStateMachine（不同模块的状态机）
+    - 遗漏 WAITING_VENDOR -> PROCESSING 回退流转
+    - 遗漏 VendorTicketService 或 WorkOrderSlaBreachService 关联变更
+verification:
+  - mvn test
+  - mvn -pl workorder-service test
+
+ground_truth: docs/benchmark/v1/telecom/large/ground-truth/telecom-large-case-d-ground-truth.yaml

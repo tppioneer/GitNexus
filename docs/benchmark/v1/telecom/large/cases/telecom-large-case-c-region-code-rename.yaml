@@ -1,0 +1,104 @@
+case: telecom-large-case-c-region-code-rename
+level: L3 - small_code_change
+title: "【50K 规模】DeviceInfo.regionCode 字段重命名"
+
+description: >
+  50,000 行规模。DeviceInfo.regionCode 是设备维护区域源字段。
+  由于项目扩容，全项目共有 18 个 regionCode 相关字段，分布在 12 个模块中。
+  其中 7 个属于传播链目标，11 个是干扰项。
+
+task: >
+  将 DeviceInfo.regionCode 重命名为 maintenanceRegionCode，
+  同步更新采集、告警、工单、Dashboard 和测试 fixture。
+  修改前先输出影响分析，修改后说明变更范围。
+
+target_field:
+  class: DeviceInfo
+  field: regionCode
+  new_name: maintenanceRegionCode
+  semantic: "设备维护区域"
+  file: common-domain/.../device/DeviceInfo.java
+
+propagation_fields:
+  - class: DeviceMetricEvent
+    field: deviceRegionCode
+    semantic: "设备区域（来自 DeviceInfo.regionCode）"
+  - class: AlarmRecord
+    field: alarmRegionCode
+    semantic: "告警区域（来自 DeviceMetricEvent.deviceRegionCode）"
+  - class: AlarmEvent
+    field: deviceRegionCode
+    semantic: "告警事件区域（来自 AlarmRecord.alarmRegionCode）"
+  - class: WorkOrder
+    field: maintenanceRegionCode
+    semantic: "工单维护区域（来自 AlarmEvent.deviceRegionCode）"
+  - class: DeviceHealthSummary (or DashboardDeviceHealth)
+    field: regionCode
+    semantic: "设备健康区域（来自 WorkOrder.maintenanceRegionCode）"
+
+interference_fields:
+  - class: Region
+    field: regionCode
+    reason: "区域实体主编码，不是设备维护区域语义"
+  - class: OperatorUser
+    field: regionCode
+    reason: "人员所属区域，不是设备维护区域"
+  - class: RegionFilterRequest
+    field: regionCode
+    reason: "区域过滤请求参数"
+  - class: NetworkSlice
+    field: regionCode
+    reason: "网络切片区域，不是设备维护区域"
+  - class: MaintenancePlan
+    field: regionCode
+    reason: "维护计划区域，不是设备维护区域"
+  - class: ShiftSchedule
+    field: regionCode
+    reason: "排班区域，不是设备维护区域"
+  - class: TopologyNode
+    field: regionCode
+    reason: "拓扑节点区域，不是设备维护区域"
+  - class: FederatedAlarmRecord
+    field: sourceRegionCode
+    reason: "联邦告警源区域，不是设备维护区域"
+  - class: DispatchOrder
+    field: targetRegionCode
+    reason: "调度目标区域，不是设备维护区域"
+  - class: VendorTicket
+    field: vendorRegionCode
+    reason: "厂商区域，不是设备维护区域"
+  - class: SlaContract
+    field: regionCode
+    reason: "SLA 合同区域，不是设备维护区域"
+
+graph_queries:
+  - 'context({name: "DeviceInfo"})'
+  - 'impact({target: "regionCode", direction: "upstream"})'
+  - 'query({search_query: "DeviceInfo region code metric alarm work order dashboard"})'
+  - 'detect_changes()'
+
+grep_searches:
+  - rg "regionCode"
+  - rg "DeviceInfo"
+  - rg "DeviceMetricEvent|AlarmRecord|WorkOrder|DashboardResponse"
+
+ground_truth: docs/benchmark/v1/telecom/large/ground-truth/telecom-large-case-c-ground-truth.yaml
+
+risk_level: HIGH
+
+scoring:
+  must_identify:
+    - DeviceInfo.regionCode 是设备维护区域源字段，改为 maintenanceRegionCode
+    - 传播链包含 DeviceMetricEvent.deviceRegionCode -> AlarmRecord.alarmRegionCode -> AlarmEvent.deviceRegionCode -> WorkOrder.maintenanceRegionCode -> DeviceHealthSummary.regionCode
+    - 必须更新 mapper 中的字段映射（DeviceMetricMapper、AlarmRecordMapper、DashboardResponseMapper 等）
+    - JSON fixture 中的 regionCode 必须对应更新
+    - 11 个干扰字段不应修改
+
+  penalty_items:
+    - 误改 Region.regionCode
+    - 误改 OperatorUser.regionCode
+    - 误改 RegionFilterRequest.regionCode
+    - 误改 NetworkSlice.regionCode 等新增干扰字段
+    - 遗漏 JSON fixture 中的字段更新
+    - 遗漏 mapper 中的字段映射
+    - 仅做字符串替换，不理解字段语义差异

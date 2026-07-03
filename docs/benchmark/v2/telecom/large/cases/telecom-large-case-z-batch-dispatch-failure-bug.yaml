@@ -1,0 +1,17 @@
+id: telecom-large-case-z-batch-dispatch-failure-bug
+name: Telecom Large batch dispatch partial failure hidden bug
+level: L2
+task_type: bug_localization
+repo: telecom-ops-platform-large
+status: reviewed
+
+prompt: |
+  回归现象：批量派单中部分工单因无可用操作员而产生 FAILED 结果，但 `/api/dispatch/batch-assign` 仍返回整体成功且没有任何逐项结果，调用方无法知道哪些工单失败。
+  请定位失败信息在哪一层被保留、又在哪一层被丢弃，并给出覆盖部分成功、全部失败和异常三种情况的测试方案。
+  不要修改代码，只输出根因、证据、影响和验证建议。
+
+extra_desc: |
+  人工审阅提示，不进入公开载荷：OrchestrationService.batchDispatch 会返回含 FAILED 的 DispatchResponse 列表并捕获单项异常；Controller 丢弃返回列表并固定 ApiResponse<Void> success(null)。
+
+ground_truth: docs/benchmark/v2/telecom/large/ground-truth/telecom-large-case-z-ground-truth.yaml
+

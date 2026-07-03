@@ -1,0 +1,65 @@
+case: telecom-large-case-n
+ground_truth_type: flow_tracing
+truth_version: "1.0"
+project_scale: "50K"
+expected_files:
+  - file: vendor-collaboration-service/.../controller/VendorTicketController.java
+  - file: vendor-collaboration-service/.../service/VendorTicketService.java
+  - file: vendor-collaboration-service/.../service/VendorSlaTrackingService.java
+  - file: vendor-collaboration-service/.../service/VendorEvaluationService.java
+  - file: vendor-collaboration-service/.../evaluation/VendorEvaluatorRegistry.java
+  - file: vendor-collaboration-service/.../evaluation/*VendorEvaluator.java
+  - file: vendor-collaboration-service/.../workflow/VendorCollaborationStateMachine.java
+  - file: vendor-collaboration-service/.../event/VendorTicketEventPublisher.java
+expected_symbols:
+  - symbol: VendorTicketController.createTicket
+  - symbol: POST /api/vendor/tickets
+  - symbol: VendorTicketService.createTicket
+  - symbol: VendorSlaTrackingService.startTracking
+  - symbol: VendorEvaluationService.evaluateVendor
+  - symbol: VendorEvaluatorRegistry.resolve
+  - symbol: VendorEvaluator.evaluate
+  - symbol: VendorCollaborationStateMachine.transition
+  - symbol: VendorTicketEventPublisher.publish
+
+expected_call_chain:
+  - step: 1
+    symbol: VendorTicketController.createTicket
+    route: POST /api/vendor/tickets
+    file: vendor-collaboration-service/.../controller/VendorTicketController.java
+  - step: 2
+    symbol: VendorTicketService.createTicket
+    file: vendor-collaboration-service/.../service/VendorTicketService.java
+    side_effect: "Validates request, creates ticket, triggers SLA tracking"
+  - step: 3
+    symbol: VendorSlaTrackingService.startTracking
+    file: vendor-collaboration-service/.../service/VendorSlaTrackingService.java
+    side_effect: "Starts SLA tracking for this vendor ticket"
+  - step: 4
+    symbol: VendorEvaluationService.evaluateVendor
+    file: vendor-collaboration-service/.../service/VendorEvaluationService.java
+    side_effect: "Evaluates vendor performance"
+  - step: 5
+    symbol: VendorEvaluatorRegistry.resolve
+    file: vendor-collaboration-service/.../evaluation/VendorEvaluatorRegistry.java
+    side_effect: "Resolves correct VendorEvaluator"
+  - step: 6
+    symbol: VendorEvaluator.evaluate
+    file: vendor-collaboration-service/.../evaluation/*VendorEvaluator.java
+    side_effect: "Polymorphic vendor evaluation"
+  - step: 7
+    symbol: VendorCollaborationStateMachine.transition
+    file: vendor-collaboration-service/.../workflow/VendorCollaborationStateMachine.java
+    side_effect: "Transitions ticket state CREATED -> AWAITING_VENDOR"
+  - step: 8
+    symbol: VendorTicketEventPublisher.publish
+    file: vendor-collaboration-service/.../event/VendorTicketEventPublisher.java
+    side_effect: "Publishes vendor ticket event"
+
+not_in_chain:
+  - WorkOrderFlowService
+  - AutoWorkOrderService
+  - DispatchEngine
+  - DeviceLifecycleService
+
+verification: mvn -pl vendor-collaboration-service test

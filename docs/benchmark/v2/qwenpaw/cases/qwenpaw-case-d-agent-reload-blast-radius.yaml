@@ -1,0 +1,20 @@
+id: qwenpaw-case-d-agent-reload-blast-radius
+name: QwenPaw agent reload reverse-call impact
+level: L2
+task_type: impact_analysis
+repo: QwenPaw
+status: draft-ground-truth
+
+prompt: |
+  为了让 agent reload 的触发原因可审计，计划给
+  schedule_agent_reload(request, agent_id) 增加一个必填的 reload_reason 参数。
+  请分析这个变更的完整影响面，包括直接和间接调用方、现有行为约束、失败风险以及需要更新的测试。
+  不要修改代码，只输出有证据支持的影响分析和验证建议。
+
+extra_desc: |
+  Case 设计与人工审阅提示，不进入模型公开载荷：
+  - 检查 schedule_agent_reload 的非阻塞行为、request 生命周期处理和异常处理。
+  - 核对直接调用它的 router 函数，并按 agents/config/MCP/OAuth/plugins/providers/skills/tools/workspace 分组。
+  - 核对 _persist_tokens、_schedule_all_agents_reload、_post_load_setup 等包装层带来的间接入口。
+  - 确认哪些调用最终会进入 MultiAgentManager.reload_agent。
+  - 检查签名变化涉及的测试和失败场景。

@@ -1,0 +1,50 @@
+case: telecom-large-case-f-dashboard-drilldown-flow
+level: L1 - flow_tracing
+title: "【50K 规模】Dashboard Drill-down 执行流追踪"
+
+description: >
+  50,000 行规模。追踪看板 drill-down 聚合查询链路。
+  新增 DashboardTrendService、DashboardHealthScoreService、
+  DashboardAlarmRankingService 等查询路径，不应与核心 drill-down 链混淆。
+
+task: >
+  请分析 GET /api/dashboard/regions/{regionCode}/drilldown 从入口到设备、告警、工单详情聚合的完整调用链。
+
+entry_point:
+  controller: DashboardDrilldownController
+  method: getDrilldown
+  route: GET /api/dashboard/regions/{regionCode}/drilldown
+
+key_components:
+  - DashboardDrilldownService
+  - DeviceClient
+  - AlarmClient
+  - WorkOrderClient
+
+interference_flows:
+  - "DashboardTrendController.getTrend (different flow, not drill-down)"
+  - "DashboardHealthScoreService.calculateScore (different flow)"
+  - "DashboardAlarmRankingService.getRanking (different flow)"
+  - "DashboardExportService.exportDashboard (different flow)"
+
+graph_queries:
+  - 'query({search_query: "dashboard drilldown region"})'
+  - 'context({name: "DashboardDrilldownController"})'
+  - 'context({name: "DashboardDrilldownService"})'
+
+grep_searches:
+  - rg "DrilldownController|DrilldownService|drilldown"
+  - rg "DeviceClient|AlarmClient|WorkOrderClient"
+  - rg "regionCode"
+
+ground_truth: docs/benchmark/v1/telecom/large/ground-truth/telecom-large-case-f-ground-truth.yaml
+
+scoring:
+  must_identify:
+    - DashboardDrilldownController.getDrilldown 入口
+    - DashboardDrilldownService.drillDownRegion 核心编排
+    - DeviceClient/AlarmClient/WorkOrderClient 三个 client 调用
+  penalty_items:
+    - 把 DashboardTrendService 纳入核心链
+    - 把 DashboardHealthScoreService 纳入核心链
+    - 把 DashboardExportService 纳入核心链

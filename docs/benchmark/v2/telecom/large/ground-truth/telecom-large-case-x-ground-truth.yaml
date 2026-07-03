@@ -1,0 +1,59 @@
+case_id: telecom-large-case-x-sla-breach-data-flow
+task_type: data_flow
+ground_truth_status: reviewed
+
+expected_entrypoints:
+  - symbol: SlaBreachDetectionService.detect
+    file: sla-engine-service/src/main/java/com/example/telecom/sla/service/SlaBreachDetectionService.java
+    reason: Loads contract/metrics, suppresses duplicates and persists new breaches.
+
+expected_symbols:
+  - symbol: SlaMetricSnapshot
+    file: common-domain/src/main/java/com/example/telecom/common/sla/SlaMetricSnapshot.java
+    reason: Supplies contractId, metricType, metricValue and fallback threshold.
+  - symbol: SlaBreachPolicy.evaluate
+    file: sla-engine-service/src/main/java/com/example/telecom/sla/monitor/SlaBreachPolicy.java
+    reason: Determines whether the snapshot violates the contract.
+  - symbol: SlaBreachDetectionService.checkBreach
+    file: sla-engine-service/src/main/java/com/example/telecom/sla/service/SlaBreachDetectionService.java
+    reason: Builds SlaBreach actualValue, threshold, severity and BREACHED status.
+  - symbol: SlaBreachDetectionService.getThresholdForMetric
+    file: sla-engine-service/src/main/java/com/example/telecom/sla/service/SlaBreachDetectionService.java
+    reason: Selects contract response/resolution/availability thresholds or snapshot fallback.
+  - symbol: SlaBreachRepository.save
+    file: sla-engine-service/src/main/java/com/example/telecom/sla/repository/SlaBreachRepository.java
+    reason: Persists each newly detected breach.
+  - symbol: SlaEventPublisher.publishBreachDetected
+    file: sla-engine-service/src/main/java/com/example/telecom/sla/event/SlaEventPublisher.java
+    reason: Constructs a SlaBreachEvent but currently only logs it rather than using eventBus.
+  - symbol: SlaBreachDetectionService.resolveBreach
+    file: sla-engine-service/src/main/java/com/example/telecom/sla/service/SlaBreachDetectionService.java
+    reason: Marks a breach MET and restores contract MET only after the last active breach is resolved.
+
+expected_data_flow:
+  - field: metricType
+    route: "SlaMetricSnapshot -> duplicate key + threshold switch -> SlaBreach.metricType -> event/log"
+  - field: metricValue
+    route: "snapshot.metricValue -> policy -> SlaBreach.actualValue -> SlaBreachEvent.actualValue(long cast)"
+  - field: threshold
+    route: "contract or snapshot fallback -> SlaBreach.threshold -> SlaBreachEvent.threshold(long cast)"
+  - field: VendorSlaStatus
+    route: "contract MET -> breach detected -> contract BREACHED; resolve last active breach -> contract MET"
+
+must_mention:
+  - PENDING contracts and contracts with no metrics return no breaches.
+  - An active breach for the same metricType suppresses creation of another, regardless of snapshot identity.
+  - response_time, resolution_time and availability use contract thresholds; unknown types use snapshot.threshold.
+  - Event publication currently constructs/logs an event but does not call eventBus.publish.
+  - Event conversion casts double actualValue/threshold to long and may lose precision.
+
+must_exclude_from_impact:
+  - symbol: SlaCalculatorRegistry.calculateAll
+    reason: Calculator aggregation is not called by breach detection.
+  - symbol: SlaReportService.generateReport
+    reason: Report generation consumes SLA data independently.
+
+recommended_validation:
+  - mvn -pl sla-engine-service -am test -Dtest=SlaBreachDetectionServiceTest
+  - Add cases for all threshold branches, duplicate metric suppression, pending/no-metric contracts, multiple active breaches and precision loss at event conversion.
+

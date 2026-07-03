@@ -1,0 +1,90 @@
+version: 1
+name: qwenpaw-multilanguage-agent-benchmark
+
+target_project:
+  name: QwenPaw
+  path: C:/qinliuwei/code/QwenPaw
+  language: python+typescript
+  build_tool: pyproject+pnpm
+  project_layout:
+    backend:
+      language: python
+      path: src/qwenpaw
+    frontend:
+      language: typescript
+      path: website
+  validation_commands:
+    - python -m pytest
+    - cd website && pnpm exec tsc -b --noEmit
+
+project_overview:
+  name: QwenPaw
+  language: Python + TypeScript
+  framework: Click CLI, FastAPI, Pydantic, Vue 3
+  lines_of_code: 88102
+  modules: 2
+  description: AI 编码助手后端服务，Python Click CLI 插件体系 + TypeScript 前端下载页面
+
+case_source:
+  directory: cases
+  golden_directory: ground-truth
+  hide_expected_fields_from_agent: true
+  cases:
+    - id: qwenpaw-case-a-cli-lazy-command-flow
+      file: cases/qwenpaw-case-a-cli-lazy-command-flow.yaml
+      golden: ground-truth/qwenpaw-case-a-cli-lazy-command-flow-ground-truth.yaml
+      task_type: flow_tracing
+      modification_case: false
+    - id: qwenpaw-case-b-plugin-loader-impact
+      file: cases/qwenpaw-case-b-plugin-loader-impact.yaml
+      golden: ground-truth/qwenpaw-case-b-plugin-loader-impact-ground-truth.yaml
+      task_type: impact_analysis
+      modification_case: false
+    - id: qwenpaw-case-c-downloads-data-flow
+      file: cases/qwenpaw-case-c-downloads-data-flow.yaml
+      golden: ground-truth/qwenpaw-case-c-downloads-data-flow-ground-truth.yaml
+      task_type: flow_tracing
+      modification_case: false
+
+run_matrix:
+  agents:
+    - claude-code
+  tool_policies:
+    - grep
+    - graph
+  repeats_per_cell: 3
+  total_required_runs: 36
+
+isolation:
+  analysis_cases:
+    fresh_agent_context: true
+    clean_worktree_required: false
+    allow_no_edit: true
+  modification_cases:
+    fresh_agent_context: true
+    clean_worktree_required: true
+    isolated_worktree_per_run: true
+    reset_or_discard_after_run: true
+  forbidden_context:
+    - golden answers
+    - previous run outputs
+    - scoring notes
+    - benchmark design discussion documents
+
+expected_report_sections:
+  - per_case_agent_policy_scores
+  - claude_code_graph_vs_grep
+  - opencode_graph_vs_grep
+  - graph_uplift_across_agents
+  - claude_code_vs_opencode_under_grep
+  - claude_code_vs_opencode_under_graph
+  - invalid_or_policy_violating_runs
+  - qualitative_failure_patterns
+  - python_backend_vs_typescript_frontend_sensitivity
+
+success_criteria:
+  - All required run cells produce a valid run-result JSON or an explicit invalid-run record.
+  - Case A reports Click LazyGroup command resolution and lazy import side effects separately.
+  - Case B reports plugin discovery, backend/frontend entry handling, dependency installation, load, unload, and cleanup separately.
+  - Case C reports route, config, CDN metadata fetch, grouping, version sorting, localization, and render data flow separately.
+  - Final report distinguishes GitNexus graph uplift from agent-specific behavior.

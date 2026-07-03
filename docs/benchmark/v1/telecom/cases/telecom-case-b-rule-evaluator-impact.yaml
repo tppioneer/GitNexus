@@ -1,0 +1,63 @@
+case: telecom-case-b-rule-evaluator-impact
+level: L2 - impact_analysis
+title: "RuleEvaluator.evaluate 接口签名变更影响分析"
+
+description: >
+  RuleEvaluator.evaluate(DeviceMetric, ThresholdRule) 是告警引擎的核心接口。
+  如果增加 EvaluationContext 参数，需要同步检查所有实现类、调用方、测试和文档。
+
+task: >
+  如果给 RuleEvaluator.evaluate(DeviceMetric metric, ThresholdRule rule)
+  增加一个 EvaluationContext context 参数，需要同步检查哪些实现类、调用方、
+  测试和文档？不要修改代码，先输出完整影响分析。
+
+target_interface:
+  name: RuleEvaluator
+  file: alarm-engine-service/src/main/java/com/example/telecom/alarm/rule/RuleEvaluator.java
+  current_signature: "EvaluationResult evaluate(DeviceMetric metric, ThresholdRule rule)"
+  proposed_signature: "EvaluationResult evaluate(DeviceMetric metric, ThresholdRule rule, EvaluationContext context)"
+
+target_implementations:
+  - CpuUsageRuleEvaluator (has overloaded evaluate(DeviceInfo) noise)
+  - MemoryUsageRuleEvaluator
+  - OpticalPowerRuleEvaluator
+  - PacketLossRuleEvaluator
+  - TemperatureRuleEvaluator
+
+target_callers:
+  - AlarmEvaluationService (core caller, uses interface variable)
+  - RuleEvaluatorRegistry (resolves and returns RuleEvaluator)
+
+noise_evaluate_methods:
+  - SlaEvaluator.evaluate (not RuleEvaluator)
+  - RiskEvaluator.evaluate (not RuleEvaluator)
+  - EscalationPolicy.evaluate (not RuleEvaluator, in workorder-service)
+  - DashboardHealthEvaluator.evaluate (not RuleEvaluator, in ops-gateway-service)
+
+graph_queries:
+  - 'impact({target: "evaluate", direction: "upstream"})'
+  - 'context({name: "RuleEvaluator"})'
+  - 'query({search_query: "alarm rule evaluator evaluation context"})'
+
+grep_searches:
+  - rg "interface RuleEvaluator|class .*RuleEvaluator|evaluate\\("
+  - rg "RuleEvaluatorRegistry|AlarmEvaluationService"
+  - rg "EvaluationResult|ThresholdRule"
+
+ground_truth: docs/benchmark/v1/telecom/ground-truth/telecom-case-b-ground-truth.yaml
+
+risk_level: HIGH
+
+scoring:
+  must_identify:
+    - 所有 5 个 RuleEvaluator 实现类必须同步修改
+    - AlarmEvaluationService 需要构造 EvaluationContext
+    - CpuUsageRuleEvaluator 有重载 evaluate(DeviceInfo)，需区分签名
+    - SlaEvaluator/RiskEvaluator/EscalationPolicy/DashboardHealthEvaluator 的 evaluate 不属于目标接口
+    - RuleEvaluatorRegistry 需要检查类型引用
+
+  penalty_items:
+    - 把 SlaEvaluator.evaluate 纳入影响面
+    - 把 RiskEvaluator.evaluate 纳入影响面
+    - 漏掉重载方法干扰
+    - 未区分接口实现和独立方法

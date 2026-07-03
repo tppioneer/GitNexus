@@ -1,0 +1,16 @@
+id: qwenpaw-case-z-corrupt-inbox-recovery-bug
+name: QwenPaw corrupt inbox store recovery failure
+level: L2
+task_type: bug_localization
+repo: QwenPaw
+status: reviewed
+
+prompt: |
+  回归现象：从旧版本迁移来的 `inbox_events.json` 尾部不完整。此后 Web Console 查询 inbox 返回 500，定时任务和 heartbeat 虽然执行完成，也无法追加新的 inbox 结果。
+  请定位读写两条路径共享的失败点，说明故障如何从一个坏文件扩散到查询和新增事件，并给出不会破坏已有有效事件的恢复与回归测试建议。
+  不要修改代码，只输出根因、证据、影响和验证建议。
+
+extra_desc: |
+  Case 设计与人工审阅提示，不进入模型公开载荷：核对 console inbox 路由、CronManager/heartbeat 生产者、inbox_store._load_events 与 append_event；区分原子替换降低写坏概率和读取端完全不处理 JSONDecodeError/OSError 这两个事实。
+
+ground_truth: docs/benchmark/v2/qwenpaw/ground-truth/qwenpaw-case-z-corrupt-inbox-recovery-bug-ground-truth.yaml
